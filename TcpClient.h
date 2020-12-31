@@ -1,0 +1,139 @@
+#ifndef TcpClient_H
+#define TcpClient_H
+
+#include "Network.h"
+
+class TcpClient : public Network
+{
+public:
+    TcpClient() = default;
+
+    TcpClient(const TcpClient &) = delete;
+    TcpClient(TcpClient &&rhs)
+    {
+        socket = rhs.socket;
+        rhs.socket = invalidSocket;
+    }
+
+    TcpClient &operator=(const TcpClient &) = delete;
+    TcpClient &operator=(TcpClient &&rhs)
+    {
+        if (socket != invalidSocket)
+            close();
+        socket = rhs.socket;
+        rhs.socket = invalidSocket;
+        return *this;
+    }
+
+    void connect(const std::string &address, unsigned short port)
+    {
+        socket = ::socket(AF_INET, SOCK_STREAM, 0);
+        if (socket == invalidSocket)
+        {
+            socket = invalidSocket;
+            error("socket");
+        }
+
+        struct sockaddr_in addr;
+        std::memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        inet_pton(AF_INET, address.c_str(), &addr.sin_addr);
+
+        code = ::connect(socket, (const struct sockaddr *)&addr, sizeof(addr));
+        if (code == errorCode)
+        {
+            closeWithoutReceiving();
+            error("connect");
+        }
+    }
+
+    Coroutine<void> send(const std::string &buff)
+    {
+        size_t length = 0;
+        Debug() << "sending" << buff.size() << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
+        while (length != buff.size())
+        {
+            do
+            {
+                code = length = ::send(socket, buff.c_str() + length, buff.size() - length, MSG_DONTWAIT);
+                Debug() << "send on socket" << socket << "returned" << code << "errno is" << errno;
+                if (tryAgain(code))
+                    co_await std::suspend_always();
+                else
+                    break;
+            } while (true);
+
+            if (code == errorCode)
+                error("send");
+
+            Debug() << length << "bytes sent";
+        }
+        Debug() << "all bytes sent on socket" << socket;
+        co_return;
+    }
+
+    Coroutine<std::string> receive()
+    {
+        size_t length = 0;
+        std::string buff(8192, 0); // TODO: this size should balance itself over time
+        Debug() << "receiving on socket" << socket;
+        do
+        {
+            code = length = recv(socket, buff.data(), buff.size(), MSG_DONTWAIT);
+            Debug() << "recv on socket" << socket << "returned" << code << "errno is" << errno;
+            if (tryAgain(code))
+                co_await std::suspend_always();
+            else
+                break;
+        } while (true);
+
+        if (code != errorCode)
+        {
+            Debug() << "received" << length << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
+            buff.resize(length);
+        }
+        else
+            error("recv");
+        co_return buff;
+    }
+
+    void close()
+    {
+        Debug() << "start close socket" << socket;
+        code = shutdown(socket, SHUT_WR);
+        if (code < 0)
+        {
+            closeWithoutReceiving();
+            return;
+        }
+        std::string buff(4096, 0);
+        do
+        {
+            code = recv(socket, buff.data(), buff.size(), 0);
+            if (code > 0)
+                throw std::runtime_error(buff);
+        } while (code > 0);
+        closeWithoutReceiving();
+    }
+
+    ~TcpClient()
+    {
+        if (socket != invalidSocket)
+            close();
+    }
+
+private:
+    void closeWithoutReceiving()
+    {
+        Debug() << "close socket" << socket;
+        ::close(socket);
+        socket = invalidSocket;
+    }
+
+    TcpClient(Socket clientSocket) { socket = clientSocket; }
+    int code;
+    friend class TcpServer;
+};
+
+#endif /* TcpClient_H */
