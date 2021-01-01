@@ -30,7 +30,6 @@ public:
         socket = ::socket(AF_INET, SOCK_STREAM, 0);
         if (socket == invalidSocket)
         {
-            socket = invalidSocket;
             error("socket");
         }
 
@@ -111,8 +110,8 @@ public:
         do
         {
             code = recv(socket, buff.data(), buff.size(), 0);
-            if (code > 0)
-                throw std::runtime_error(buff);
+            //if (code > 0)
+            //    throw std::runtime_error(buff);
         } while (code > 0);
         closeWithoutReceiving();
     }

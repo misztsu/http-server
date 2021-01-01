@@ -60,9 +60,16 @@ public:
         if ((event.events & EPOLLRDHUP) == EPOLLRDHUP)
             Debug() << "EPOLLRDHUP event on socket" << (int)event.data.fd;
 
-        auto &task = tasks.at(event.data.fd);
-        if (!task)
-            task.resume();
+        auto it = tasks.find(event.data.fd);
+        if (!it->second)
+        {
+            it->second.resume();
+            if (it->second)
+            {
+                Debug() << "socket" << it->first << "erased from epoll manager";
+                tasks.erase(it);
+            }
+        }
         else
             throw std::runtime_error("there is finished task not removed from epoll manager");
     }
