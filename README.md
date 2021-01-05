@@ -7,7 +7,7 @@ Http-server jest asynchronicznym serwerem HTTP opartym o `epoll` oraz korutyny z
 _Wymagane co najmniej g++ w wersji 10._
 
 ```sh
-g++ -O2 -Wall -Wextra -pedantic -std=c++20 -fcoroutines main.cpp -o server
+g++ -O2 -Wall -Wextra -pedantic -Wno-unused-parameter -std=c++20 -fcoroutines -pthread main.cpp -o server
 ```
 
 ## TODO:

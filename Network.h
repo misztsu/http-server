@@ -18,7 +18,6 @@ class Network
 public:
     using Socket = int;
     static constexpr Socket invalidSocket = -1;
-    static constexpr int errorCode = -1;
 
     Socket getSocket() const
     {

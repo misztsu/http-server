@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include "Debug.h"
 
+static constexpr int errorCode = -1;
+
 template <class T>
 static void error(T &&message)
 {

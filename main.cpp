@@ -1,7 +1,9 @@
+#include <future>
+
 #include "TcpServer.h"
 #include "EpollManager.h"
 
-Coroutine<void> clientHandlingTask(TcpClient &&client)
+Coroutine<void> clientHandlingTask(TcpClient &&client, Notify notify)
 {
     TcpClient tcpClient = std::move(client);
     co_await std::suspend_always();
@@ -13,7 +15,15 @@ Coroutine<void> clientHandlingTask(TcpClient &&client)
     if (message.value().size() == 0)
         co_return;
 
-    auto sent = tcpClient.send("HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/html; charset=utf-8\r\n\r\nHello");
+    auto response = std::async(std::launch::async, [](Notify notify) {
+        auto response = "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/html; charset=utf-8\r\n\r\nHello";
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // simulate blocking operation
+
+        return response;
+    }, std::move(notify));
+    co_await std::suspend_always();
+
+    auto sent = tcpClient.send(response.get());
     iterative_co_await(sent);
 
     tcpClient.close();
@@ -25,8 +35,10 @@ Coroutine<void> acceptingTask(TcpServer &&tcpServer, EpollManager &epollManager)
     while (true)
     {
         TcpClient tcpClient = (co_await tcpServer.accept()).value();
+        Notify notify;
         Network::Socket clientSocket = tcpClient.getSocket();
-        epollManager.addSocket(clientSocket, clientHandlingTask(std::move(tcpClient)));
+        Notify::FileDescriptor efd = notify.getFileDescriptor();
+        epollManager.addSocket(clientSocket, efd, clientHandlingTask(std::move(tcpClient), std::move(notify)));
     }
 }
 
