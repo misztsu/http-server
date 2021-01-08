@@ -2,12 +2,18 @@
 
 Http-server jest asynchronicznym serwerem HTTP opartym o `epoll` oraz korutyny ze standardu C++20.
 
-## Kompilacja
+## Building
 
-_Wymagane co najmniej g++ w wersji 10._
+Build with cmake.
+
+This version works only on linux (because of epoll)
+and requires g++ version 10+ (because of coroutines).
+In case it is not your default C++ compiler you can use
+`DCMAKE_CXX_COMPILER` option, for example on Ubuntu 20.04:
 
 ```sh
-g++ -O2 -Wall -Wextra -pedantic -Wno-unused-parameter -std=c++20 -fcoroutines -pthread main.cpp -o server
+cmake -B build -DCMAKE_CXX_COMPILER=g++-10
+cmake --build build
 ```
 
 ## TODO:
