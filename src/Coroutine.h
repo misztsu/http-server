@@ -77,7 +77,7 @@ public:
 
     bool resume() const
     {
-        Debug() << "resume coroutine";
+        DEBUG << "resume coroutine";
         if (!done())
             coroutineHandle.resume();
         return !done();
@@ -112,7 +112,7 @@ public:
         }
         else
         {
-            Debug() << "coroutine has no return value";
+            DEBUG << "coroutine has no return value";
             throw std::runtime_error("coroutine has no return value");
         }
     }

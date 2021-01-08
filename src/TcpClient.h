@@ -50,13 +50,13 @@ public:
     Coroutine<void> send(const std::string &buff)
     {
         size_t length = 0;
-        Debug() << "sending" << buff.size() << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
+        DEBUG << "sending" << buff.size() << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
         while (length != buff.size())
         {
             do
             {
                 code = length = ::send(socket, buff.c_str() + length, buff.size() - length, MSG_DONTWAIT);
-                Debug() << "send on socket" << socket << "returned" << code << "errno is" << errno;
+                DEBUG << "send on socket" << socket << "returned" << code << "errno is" << errno;
                 if (tryAgain(code))
                     co_await std::suspend_always();
                 else
@@ -66,9 +66,9 @@ public:
             if (code == errorCode)
                 error("send");
 
-            Debug() << length << "bytes sent";
+            DEBUG << length << "bytes sent";
         }
-        Debug() << "all bytes sent on socket" << socket;
+        DEBUG << "all bytes sent on socket" << socket;
         co_return;
     }
 
@@ -76,11 +76,11 @@ public:
     {
         size_t length = 0;
         std::string buff(8192, 0); // TODO: this size should balance itself over time
-        Debug() << "receiving on socket" << socket;
+        DEBUG << "receiving on socket" << socket;
         do
         {
             code = length = recv(socket, buff.data(), buff.size(), MSG_DONTWAIT);
-            Debug() << "recv on socket" << socket << "returned" << code << "errno is" << errno;
+            DEBUG << "recv on socket" << socket << "returned" << code << "errno is" << errno;
             if (tryAgain(code))
                 co_await std::suspend_always();
             else
@@ -89,7 +89,7 @@ public:
 
         if (code != errorCode)
         {
-            Debug() << "received" << length << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
+            DEBUG << "received" << length << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
             buff.resize(length);
         }
         else
@@ -99,7 +99,7 @@ public:
 
     void close()
     {
-        Debug() << "start close socket" << socket;
+        DEBUG << "start close socket" << socket;
         code = shutdown(socket, SHUT_WR);
         if (code < 0)
         {
@@ -125,7 +125,7 @@ public:
 private:
     void closeWithoutReceiving()
     {
-        Debug() << "close socket" << socket;
+        DEBUG << "close socket" << socket;
         ::close(socket);
         socket = invalidSocket;
     }

@@ -1,20 +1,26 @@
 #ifndef TCPSERVER_H
 #define TCPSERVER_H
 
+#include <functional>
+
+#include "Coroutine.h"
+#include "EpollManager.h"
 #include "TcpClient.h"
 
 class TcpServer : public Network
 {
 public:
+
     TcpServer() = default;
     
+    //TODO remake all constructors (not used atm, they dont handle callback and epollmanager)
+    /*
     TcpServer(const TcpServer &) = delete;
     TcpServer(TcpServer &&rhs)
     {
         socket = rhs.socket;
         rhs.socket = invalidSocket;
     }
-
     TcpServer &operator =(const TcpServer &) = delete;
     TcpServer &operator =(TcpServer &&rhs)
     {
@@ -23,6 +29,14 @@ public:
         socket = rhs.socket;
         rhs.socket = invalidSocket;
         return *this;
+    }
+    */
+
+    using ClientTaskCallbackType = std::function<Coroutine<void>(TcpClient&&, Notify)>;
+
+    void setClientTaskCallback(ClientTaskCallbackType&& callback)
+    {
+        clientTaskCallback = callback;
     }
 
     void bind(unsigned short port)
@@ -56,17 +70,19 @@ public:
             error("bind");
         }
 
-        Debug() << "socket" << socket << "bound to port" << port << "successfully";
+        DEBUG << "socket" << socket << "bound to port" << port << "successfully";
+
+        addAcceptingTask();
     }
 
     Coroutine<TcpClient> accept()
     {
-        Debug() << "accepting on socket" << socket << "started";
+        DEBUG << "accepting on socket" << socket << "started";
         Socket clientSocket;
         do
         {
             clientSocket = ::accept(socket, nullptr, nullptr);
-            Debug() << "accept on socket" << socket << "returned" << clientSocket;
+            DEBUG << "accept on socket" << socket << "returned" << clientSocket;
             if (tryAgain(clientSocket))
                 co_await std::suspend_always();
             else
@@ -85,9 +101,20 @@ public:
 
     void close()
     {
-        Debug() << "close socket" << socket;
+        DEBUG << "close socket" << socket;
         ::close(socket);
         socket = invalidSocket;
+    }
+
+    void wait()
+    {
+        epollManager.wait();
+    }
+
+    void waitForever()
+    {
+        while(true)
+            wait();
     }
 
     ~TcpServer()
@@ -97,6 +124,31 @@ public:
     }
 
 private:
+
+    void addAcceptingTask()
+    {
+        epollManager.addSocket(getSocket(), acceptingTask());
+    }
+
+    Coroutine<void> acceptingTask()
+    {
+        DEBUG << "accepting task started";
+        co_await std::suspend_always();
+        while (true)
+        {
+            auto tcpClientCoroutine = co_await accept();
+            iterative_co_await(tcpClientCoroutine);
+            TcpClient tcpClient = tcpClientCoroutine.value();
+            Notify notify;
+            Network::Socket clientSocket = tcpClient.getSocket();
+            Notify::FileDescriptor efd = notify.getFileDescriptor();
+            epollManager.addSocket(clientSocket, efd, clientTaskCallback(std::move(tcpClient), std::move(notify)));
+        }
+    }
+
+    
+    ClientTaskCallbackType clientTaskCallback;
+    EpollManager epollManager;
     int code;
 };
 

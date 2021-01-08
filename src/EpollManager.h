@@ -50,7 +50,7 @@ public:
 private:
     void notify() const
     {
-        Debug() << "notify eventfd" << efd;
+        DEBUG << "notify eventfd" << efd;
         uint64_t buff = 1;
         if (write(efd, &buff, sizeof(uint64_t)) != sizeof(uint64_t))
             error("notify");
@@ -90,7 +90,7 @@ public:
 
     void addSocket(Network::Socket socket, Notify::FileDescriptor efd, Coroutine<void> &&task)
     {
-        Debug() << "adding socket" << socket << "to epoll manager";
+        DEBUG << "adding socket" << socket << "to epoll manager";
         epoll_event event;
 
         event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET;
@@ -121,7 +121,7 @@ public:
 
     void wait()
     {
-        Debug() << "waiting";
+        DEBUG << "waiting";
         epoll_event event;
         code = epoll_wait(epollFileDescriptor, &event, 1, -1);
         if (code == errorCode)
@@ -130,13 +130,13 @@ public:
         Descriptors descriptors = Descriptors::fromUint64(event.data.u64);
 
         if ((event.events & EPOLLIN) == EPOLLIN)
-            Debug() << "EPOLLIN event on fd" << descriptors.socket << "or" << descriptors.efd;
+            DEBUG << "EPOLLIN event on fd" << descriptors.socket << "or" << descriptors.efd;
 
         if ((event.events & EPOLLOUT) == EPOLLOUT)
-            Debug() << "EPOLLOUT event on fd" << descriptors.socket;
+            DEBUG << "EPOLLOUT event on fd" << descriptors.socket;
 
         if ((event.events & EPOLLRDHUP) == EPOLLRDHUP)
-            Debug() << "EPOLLRDHUP event on fd" << descriptors.socket;
+            DEBUG << "EPOLLRDHUP event on fd" << descriptors.socket;
 
         auto it = tasks.find(descriptors.socket);
         if (!it->second)
@@ -144,7 +144,7 @@ public:
             it->second.resume();
             if (it->second)
             {
-                Debug() << "socket" << it->first << "erased from epoll manager";
+                DEBUG << "socket" << it->first << "erased from epoll manager";
                 tasks.erase(it);
                 Notify::close(descriptors.efd);
             }
