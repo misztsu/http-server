@@ -141,6 +141,7 @@ public:
         auto it = tasks.find(descriptors.socket);
         if (!it->second)
         {
+            DEBUG << "Resuming task for descriptor" << descriptors.socket;
             it->second.resume();
             if (it->second)
             {

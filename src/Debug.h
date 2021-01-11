@@ -1,12 +1,12 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include <filesystem>
 #include <iostream>
 #include <utility>
 #include <string>
 
-#define FILENAME std::string(__FILE__).substr(std::string(__FILE__).find_last_of('/') + 1)
-#define DEBUG Debug() << '[' << FILENAME << __LINE__ << ']'
+#define DEBUG Debug() << '[' << std::filesystem::path(__FILE__).filename().string() << __LINE__ << ']'
 
 class Debug
 {

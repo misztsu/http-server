@@ -111,6 +111,7 @@ public:
         epollManager.wait();
     }
 
+    [[noreturn]]
     void waitForever()
     {
         while(true)
