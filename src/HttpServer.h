@@ -52,7 +52,6 @@ private:
         iterative_co_await(requestCoroutine);
         HttpRequest request = requestCoroutine.value();
 
-        HttpResponse response;
 
         DEBUG << "received request" << request.method << request.uriBase;
 
@@ -67,8 +66,8 @@ private:
         if (!callback)
             callback = {defaultCallback};
 
-        bool resume = false;
-        auto promise = std::async(std::launch::async, [&](Notify notify) {
+        auto response = std::async(std::launch::async, [&](Notify notify) {
+            HttpResponse response;
             try {
                 callback.value()(request, response);
             } catch (const std::exception &e) {
@@ -81,15 +80,16 @@ private:
 
             //TODO DELETE THIS
             std::this_thread::sleep_for(std::chrono::milliseconds(60)); // simulate blocking operation
-
             DEBUG << "Response callback ending";
-            resume = true;
-        }, std::move(notify));
-        while (!resume)
-            co_await std::suspend_always();
 
-        auto sendCoroutine = response.send(tcpClient);
+            return response;
+        }, notify.createCopy());
+        co_await std::suspend_always();
+
+        auto sendCoroutine = response.get().send(tcpClient);
         iterative_co_await(sendCoroutine);
+
+        notify.release();
 
         tcpClient.close();
     }
@@ -98,13 +98,13 @@ private:
     static void default404(HttpRequest &request, HttpResponse &response)
     {
         response.setStatus(404);
-        response.setBody("<h1>404</h1> Resource not found<br/>:(");
+        response.setBody("<h1>404</h1> Resource not found <br/> :(");
     }
     static void fatal500(HttpRequest &request, HttpResponse &response)
     {
         DEBUG << "UNHANDLED EXCEPTION WHILE PROCESSING" << request.method << request.uri;
         response.setStatus(500);
-        response.setBody("<h1>500</h1>Unhandled exception happended while processing the request<br/>:(");
+        response.setBody("<h1>500</h1> Unhandled exception happended while processing the request <br/> :(");
     }
 
 };

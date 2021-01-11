@@ -28,7 +28,7 @@ public:
     Notify &operator=(Notify &&rhs)
     {
         if (efd != invalid)
-            notify();
+            operator()();
         efd = rhs.efd;
         rhs.efd = invalid;
         return *this;
@@ -42,19 +42,32 @@ public:
     ~Notify()
     {
         if (efd != invalid)
-            notify();
+            operator()();
     }
 
     static constexpr FileDescriptor invalid = -1;
 
-private:
-    void notify() const
+    void operator()() const
     {
         DEBUG << "notify eventfd" << efd;
         uint64_t buff = 1;
         if (write(efd, &buff, sizeof(uint64_t)) != sizeof(uint64_t))
             error("notify");
     }
+
+    void release()
+    {
+        efd = invalid;
+    }
+
+    Notify createCopy()
+    {
+        return Notify(efd);
+    }
+
+private:
+
+    Notify(int efd) : efd(efd) {}
 
     static void close(FileDescriptor efd)
     {
