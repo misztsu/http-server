@@ -12,7 +12,7 @@ import { withStyles } from '@material-ui/core/styles'
 import Typography from '@material-ui/core/Typography'
 import DeleteIcon from '@material-ui/icons/Delete'
 import EditIcon from '@material-ui/icons/Edit'
-import PaletteIcon from '@material-ui/icons/Palette'
+import SaveIcon from '@material-ui/icons/Save'
 import MDEditor from '@uiw/react-md-editor'
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -31,17 +31,27 @@ const useStyles = (theme) => ({
         paddingRight: '4px',
         borderLeftWidth: '4px',
         borderLeftStyle: 'solid',
-        borderLeftColor: theme.typography.body1.fontFamily,
+        borderLeftColor: theme.palette.primary.main,
         backgroundColor: 'rgba(0, 0, 0, 0.16)',
         borderTopRightRadius: '4px',
-        borderBottomRightRadius: '4px'
+        borderBottomRightRadius: '4px',
+        whiteSpace: 'pre',
+        display: 'block'
     },
     code: {
         paddingLeft: '4px',
         paddingRight: '4px',
         backgroundColor: 'rgba(0, 0, 0, 0.16)',
         borderRadius: '4px',
-        whiteSpace: 'pre'
+        whiteSpace: 'pre',
+        display: 'block'
+    },
+    li: {
+        marginLeft: '-18px',
+        listStyleType: 'none'
+    },
+    checkbox: {
+        padding: '0 4px 4px 0'
     },
     editor: {
         '--background-paper': theme.palette.background.paper,
@@ -57,7 +67,7 @@ class Note extends React.Component {
         super(props)
 
         this.state = {
-            expanded: false,
+            expanded: props.expanded,
             content: props.content
         }
 
@@ -66,12 +76,30 @@ class Note extends React.Component {
 
     }
 
+    componentDidUpdate(prevProps) {
+        if (this.props.content !== prevProps.content)
+            this.setState({ content: this.props.content })
+    }
+
     expand() {
+        if (this.state.expanded) {
+            localStorage.setItem('notes', JSON.stringify(
+                JSON.parse(localStorage.getItem('notes')).map(note => note.id == this.props.id ? {
+                    ...note,
+                    content: this.state.content
+                } : note)
+            ))
+            this.props.onRefresh()
+        }
         this.setState({ expanded: !this.state.expanded })
     }
 
     delete() {
-        this.props.onDelete(this.props.id)
+        localStorage.setItem('notes', JSON.stringify(
+            JSON.parse(localStorage.getItem('notes')).filter(note => note.id != this.props.id)
+        ))
+        console.log(JSON.parse(localStorage.getItem('notes')))
+        this.props.onRefresh()
     }
 
     render() {
@@ -90,10 +118,10 @@ class Note extends React.Component {
                                     div: props => <div>{props.children}</div>,
                                     strong: props => <Box fontWeight="fontWeightBold" component="span">{props.children}</Box>,
                                     emphasis: props => <Box fontStyle="italic" component="span">{props.children}</Box>,
-                                    inlineCode: props => <Box className={classes.code} fontFamily="Monospace" fontSize="1.2rem" component="span">{props.children}</Box>,
-                                    code: props => <Box className={classes.code} fontFamily="Monospace" fontSize="1.2rem" component="p">{props.value}</Box>,
-                                    blockquote: props => <Box className={classes.blockquote} component="p">{props.children}</Box>,
-                                    listItem: props => props.checked === null ? <li>{props.children}</li> : <li style={{ marginLeft: '-18px', listStyleType: 'none' }}><Checkbox style={{ padding: '0 4px 0 0' }} size="small" checked={Boolean(props.checked)} />{props.children}</li>,
+                                    inlineCode: props => <Box className={classes.code} fontFamily="Monospace" component="span">{props.children}</Box>,
+                                    code: props => <Box className={classes.code} fontFamily="Monospace" component="span">{props.value}</Box>,
+                                    blockquote: props => <Box className={classes.blockquote} component="span">{props.children}</Box>,
+                                    listItem: props => props.checked === null ? <li>{props.children}</li> : <li className={classes.li}><Checkbox color="primary" size="small" className={classes.checkbox} checked={Boolean(props.checked)} />{props.children}</li>,
                                     thematicBreak: Divider
                                 }}
                                 escapeHtml={false}
@@ -104,15 +132,11 @@ class Note extends React.Component {
                 <CardActions disableSpacing>
 
                     <IconButton onClick={this.like} onClick={this.delete}>
-                        <DeleteIcon fontSize="small" />
-                    </IconButton>
-
-                    <IconButton>
-                        <PaletteIcon fontSize="small" />
+                        <DeleteIcon />
                     </IconButton>
 
                     <IconButton onClick={this.expand}>
-                        <EditIcon fontSize="small" />
+                        {this.state.expanded ? <SaveIcon /> : <EditIcon />}
                     </IconButton>
 
                 </CardActions>
@@ -131,8 +155,9 @@ class Note extends React.Component {
 }
 
 Note.defaultProps = {
-    onDelete: (_) => { },
-    content: ''
+    onRefresh: (_) => { },
+    content: '',
+    expanded: false
 }
 
 export default withStyles(useStyles)(Note)

@@ -3,6 +3,7 @@ import Avatar from '@material-ui/core/Avatar'
 import CssBaseline from '@material-ui/core/CssBaseline'
 import Divider from '@material-ui/core/Divider'
 import Drawer from '@material-ui/core/Drawer'
+import Fab from '@material-ui/core/Fab'
 import IconButton from '@material-ui/core/IconButton'
 import InputBase from '@material-ui/core/InputBase'
 import List from '@material-ui/core/List'
@@ -13,10 +14,14 @@ import ListItemText from '@material-ui/core/ListItemText'
 import Paper from '@material-ui/core/Paper'
 import { withStyles } from '@material-ui/core/styles'
 import Toolbar from '@material-ui/core/Toolbar'
-import ExitToAppIcon from '@material-ui/icons/ExitToApp'
+import Zoom from '@material-ui/core/Zoom'
+import AddIcon from '@material-ui/icons/Add'
+import GitHubIcon from '@material-ui/icons/GitHub'
 import MenuIcon from '@material-ui/icons/Menu'
+import ReplayIcon from '@material-ui/icons/Replay'
 import SearchIcon from '@material-ui/icons/Search'
 import React from 'react'
+import exampleNotes from '../exampleNotes'
 
 const useStyles = (theme) => ({
     list: {
@@ -45,7 +50,19 @@ const useStyles = (theme) => ({
     input: {
         marginLeft: theme.spacing(1),
         flex: 1,
-    }
+    },
+    fabButton: {
+        position: 'absolute',
+        zIndex: 1,
+        top: -30,
+        left: 0,
+        right: 0,
+        margin: '0 auto',
+    },
+    main: {
+        color: theme.palette.getContrastText(theme.palette.primary.main),
+        backgroundColor: theme.palette.primary.main,
+    },
 })
 
 
@@ -68,7 +85,6 @@ class Navbar extends React.Component {
     }
 
     handleSearchTextSubmit(e) {
-        this.setState({ searchText: e.target.value })
         this.props.onSearchText(e.target.value)
         e.preventDefault()
     }
@@ -83,6 +99,12 @@ class Navbar extends React.Component {
                         <IconButton edge="start" color="inherit" className={classes.menuButton} onClick={() => this.setState({ open: true })}>
                             <MenuIcon />
                         </IconButton>
+
+                        <Zoom in={this.state.searchText.length === 0}>
+                            <Fab color="primary" aria-label="add" className={classes.fabButton} onClick={this.props.onAdd}>
+                                <AddIcon />
+                            </Fab >
+                        </Zoom>
 
                         <Paper component="form" className={classes.searchField} onSubmit={this.handleSearchTextSubmit}>
                             <InputBase
@@ -105,18 +127,20 @@ class Navbar extends React.Component {
                         <List className={classes.list}>
                             <ListItem>
                                 <ListItemAvatar>
-                                    <Avatar alt={'Abc'} />
+                                    <Avatar className={classes.main}>^•ﻌ•^</Avatar>
                                 </ListItemAvatar>
-                                <ListItemText
-                                    primary={'Abc'}
-                                />
+                                <ListItemText primary={'Kitty Notes'} />
                             </ListItem>
                         </List>
                         <Divider />
                         <List>
-                            <ListItem button>
-                                <ListItemIcon><ExitToAppIcon /></ListItemIcon>
-                                <ListItemText primary={'Xyz'} />
+                            <ListItem button onClick={() => { localStorage.setItem('notes', JSON.stringify(exampleNotes)); this.props.onRefresh() }}>
+                                <ListItemIcon><ReplayIcon /></ListItemIcon>
+                                <ListItemText primary={'Load example notes'} />
+                            </ListItem>
+                            <ListItem button component="a" href="https://github.com/misztsu/http-server">
+                                <ListItemIcon><GitHubIcon /></ListItemIcon>
+                                <ListItemText primary={'Visit GitHub repository'} />
                             </ListItem>
                         </List>
                     </Drawer>
@@ -127,7 +151,9 @@ class Navbar extends React.Component {
 }
 
 Navbar.defaultProps = {
-    onSearchText: (_) => { }
+    onSearchText: (_) => { },
+    onAdd: () => { },
+    onRefresh: (_) => { }
 }
 
 export default withStyles(useStyles)(Navbar)

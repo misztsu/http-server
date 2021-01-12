@@ -23,10 +23,10 @@ cmake --build build
 - [x] implementacja klas obietnic potrzebnych do korutyn
 - [x] implementacja systemu wznawiającego korutyny z `epoll`
 - [ ] implementacja `HttpServer` z jakimś interfejsem typu `server.use<GET>(std::regex(...), [](Request &req, Response &Res) { ... });`
-    - [ ] połączenie z `epoll`
-    - [ ] parsowanie wiadomości HTTP
-    - [ ] implementacja tego `use<>`
-    - [ ] `Request` i `Response`
+    - [x] połączenie z `epoll`
+    - [x] parsowanie wiadomości HTTP
+    - [x] implementacja tego `use<>`
+    - [x] `Request` i `Response`
     - [ ] cache dla zasobów
 - [ ] implementacja aplikacji opartej o `HttpServer`
-- [ ] frontend
+- [x] frontend

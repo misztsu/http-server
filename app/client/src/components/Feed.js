@@ -33,25 +33,15 @@ class Feed extends React.Component {
     constructor(props) {
         super(props)
 
-        this.state = {
-            notes: JSON.parse(localStorage.getItem('notes'))
-        }
-
         this.search = this.search.bind(this)
-        this.handleNoteDelete = this.handleNoteDelete.bind(this)
     }
 
     search() {
-        return this.state.notes.map(note => ({
+        return this.props.notes.map(note => ({
             ...note,
             visible: this.props.searchText === '' || this.props.searchText.toLowerCase().split(/\s+/).every(el => note.content.toLowerCase().indexOf(el) !== -1)
         }))
     }
-
-    handleNoteDelete(id) {
-        this.setState({ notes: this.state.notes.filter(note => note.id != id) })
-    }
-
     render() {
         const { classes } = this.props
 
@@ -62,7 +52,7 @@ class Feed extends React.Component {
                         this.search().map(
                             (note, id) => (
                                 <Grid item key={id} className={note.visible !== false ? null : this.props.classes.hidden}>
-                                    <Note onDelete={this.handleNoteDelete} {...note} />
+                                    <Note onRefresh={this.props.onRefresh} {...note} />
                                 </Grid>
                             )
                         )
@@ -74,7 +64,8 @@ class Feed extends React.Component {
 }
 
 Feed.defaultProps = {
-    searchText: ''
+    searchText: '',
+    onRefresh: (_) => { },
 }
 
 export default withStyles(useStyles)(Feed)

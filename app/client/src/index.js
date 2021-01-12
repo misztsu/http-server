@@ -6,21 +6,6 @@ import App from './App';
 import './index.css';
 import theme from './theme';
 
-localStorage.setItem('notes', JSON.stringify([
-    {
-        id: 1,
-        content: 'a'
-    },
-    {
-        id: 2,
-        content: 'b'
-    },
-    {
-        id: 3,
-        content: 'c'
-    }
-]))
-
 ReactDOM.render(
     <ThemeProvider theme={theme}>
         <CssBaseline />

@@ -25,11 +25,69 @@ body,
 }
 
 .w-md-editor-toolbar {
-    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.w-md-editor-toolbar li.active > button {
-    color: var(--primary-color);
+.w-md-editor-toolbar-divider {
+    height: 16px;
+    background-color:rgba(255, 255, 255, 0.12);
 }
 
-.w-md-editor-toolbar ul li:nth-of-type(1n+15) {display: none;}
+.w-md-editor-toolbar li.active>button,
+.w-md-editor-toolbar li>button:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 100%;
+}
+
+.w-md-editor-toolbar li>button>svg {
+    height: 14px;
+    width: 14px;
+}
+
+.w-md-editor-toolbar li>button {
+    height: 16px;
+    width: 16px;
+    box-sizing: content-box;
+    padding: 10px;
+    margin: 0;
+    vertical-align: middle;
+    justify-content: center;
+}
+
+.w-md-editor-toolbar ul li:nth-of-type(1n+15) {
+    display: none;
+}
+
+/*
+Ripple effect from
+https://codepen.io/r-i-c-h/pen/MRyOOO
+*/
+.w-md-editor-toolbar li>button {
+    position: relative;
+    overflow: hidden;
+    transform: translate3d(0, 0, 0);
+}
+
+.w-md-editor-toolbar li>button:after {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(10, 10);
+    opacity: 0;
+    transition: transform .5s, opacity 1s;
+}
+
+.w-md-editor-toolbar li>button:active:after {
+    transform: scale(0, 0);
+    opacity: .3;
+    transition: 0s;
+}
