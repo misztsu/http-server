@@ -1,0 +1,35 @@
+html,
+body,
+#root,
+.App {
+    height: 100%;
+}
+
+.w-md-editor,
+.w-md-editor-toolbar {
+    background-color: var(--background-paper);
+    box-shadow: none;
+    padding: 8px;
+}
+
+.w-md-editor-text-pre,
+.w-md-editor-text-pre *,
+.w-md-editor-text-input,
+.w-md-editor-text-input *,
+.wmde-markdown,
+.w-md-editor-toolbar li>button,
+.w-md-editor-text-pre .title {
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    color: var(--color);
+}
+
+.w-md-editor-toolbar {
+    border: none;
+}
+
+.w-md-editor-toolbar li.active > button {
+    color: var(--primary-color);
+}
+
+.w-md-editor-toolbar ul li:nth-of-type(1n+15) {display: none;}
