@@ -4,7 +4,8 @@
 #include <coroutine>
 #include <exception>
 #include <type_traits>
-#include <optional>
+#include <future>
+#include <chrono>
 
 #include "Debug.h"
 
@@ -18,18 +19,14 @@ struct Promise
     {
         auto exceptionPtr = std::current_exception();
         if (exceptionPtr)
-            std::rethrow_exception(exceptionPtr);
+            promise.set_exception(exceptionPtr);
     }
     template <class U>
-    void return_value(U &&u) { optional = std::forward<U>(u); }
-    bool hasValue() const { return optional.has_value(); }
-    T value()
-    {
-        T value = std::move(*optional);
-        optional.reset();
-        return value;
-    }
-    std::optional<T> optional;
+    void return_value(U &&u) { promise.set_value(std::forward<U>(u)); }
+    bool hasValue() const { return future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready; }
+    T value() { return future.get(); }
+    std::promise<T> promise;
+    std::future<T> future = promise.get_future();
 };
 
 template <>
@@ -42,11 +39,14 @@ struct Promise<void>
     {
         auto exceptionPtr = std::current_exception();
         if (exceptionPtr)
-            std::rethrow_exception(exceptionPtr);
+            promise.set_exception(exceptionPtr);
     }
-    constexpr void return_void() noexcept {}
-    bool hasValue() const { return false; }
+    void return_void() { promise.set_value(); }
+    bool hasValue() const { return future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready; }
     constexpr void value() noexcept {}
+
+    std::promise<void> promise;
+    std::future<void> future = promise.get_future();
 };
 
 template <class T>
@@ -119,7 +119,7 @@ public:
 
     bool await_ready() const
     {
-        return done();
+        return hasValue();
     }
 
     constexpr void await_suspend(std::coroutine_handle<>) const noexcept { }
@@ -139,6 +139,6 @@ private:
 {                                           \
     while (!coroutine)                      \
         coroutine = co_await coroutine;     \
-}   
+}
 
 #endif /* COROUTINE_H */
