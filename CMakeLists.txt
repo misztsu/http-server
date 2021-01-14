@@ -13,6 +13,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+add_subdirectory(thirdparty/json)
+
 # gcc 10+ only
 # TODO other compilers?
 add_compile_options(-Wall -Wextra -pedantic -Wno-unused-parameter)
@@ -22,4 +24,5 @@ add_executable(server
     src/main.cpp
 )
 
+target_link_libraries(server PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(server PRIVATE Threads::Threads)

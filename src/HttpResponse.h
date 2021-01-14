@@ -99,30 +99,55 @@ public:
     };
     static Status toStatus(int status) { return static_cast<Status>(status); }
 
-    HttpResponse(Status status = OK) : status(status) {}
-
     Status getStatus() const { return status; }
-    void setStatus(Status status) { this->status = status; }
-    void setStatus(int status) { this-> status = toStatus(status); }
+    HttpResponse &setStatus(Status status)
+    {
+        this->status = status;
+        return *this;
+    }
+    HttpResponse &setStatus(int status)
+    {
+        this->status = toStatus(status);
+        return *this;
+    }
 
-    void setBody(const std::string &body, const std::string &contentType = "text/html", std::vector<std::string> parameters = {"charset=utf-8"})
+    HttpResponse &setBody(const std::string &body, const std::string &contentType = "text/html", std::vector<std::string> parameters = {"charset=utf-8"})
     {
         this->body = body;
         rawHeaders["Content-type"] = contentType;
         for (auto &parameter : parameters)
             rawHeaders["Content-type"] += "; " + parameter;
+        return *this;
+    }
+    HttpResponse &setJsonBody(const json &jsonBody)
+    {
+        setBody(jsonBody.dump(), "application/json");
+        return *this;
+    }
+
+    void send()
+    {
+        done = true;
     }
 
 private:
 
+    HttpResponse(HttpRequest &request, Status status = OK) : request(request), status(status) {}
+
+    HttpRequest &request;
     Status status;
+
+    bool done = false;
+
+    friend class RequestHandler;
+    bool isReady() { return done; }
 
     Coroutine<void> send(TcpClient &tcpClient)
     {
         if (!body.empty())
             rawHeaders["Content-Length"] = std::to_string(body.size());
-        //TODO persistent connections
-        rawHeaders["Connection"] = "close";
+
+        rawHeaders["Connection"] = request.getHeader("Connection");
 
         std::string message = "HTTP/1.1 " + statusToLine.at(status) + crlf;
 
@@ -130,9 +155,11 @@ private:
             message += header + ": " + value + crlf;
         
         message += crlf;
-        message += body;
+        
+        if (request.getMethod() != HttpRequest::Method::head)
+            message += body;
 
-        // DEBUG << "completed body:" << message;
+        DEBUG << "Completed message:" << message;
 
         auto sendCoroutine = tcpClient.send(message);
         iterative_co_await(sendCoroutine);

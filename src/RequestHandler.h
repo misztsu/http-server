@@ -8,6 +8,7 @@
 #include "Coroutine.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
+#include "RequestUtils.h"
 
 class RequestHandler
 {
@@ -15,7 +16,8 @@ public:
     using CallbackType = std::function<void(HttpRequest&, HttpResponse&)>;
     // using ChainCallbackType = std::function<bool(HttpRequest&, HttpResponse&);
 
-    RequestHandler(std::string pathTemplate, CallbackType callback)
+    template <typename... CallbackT>
+    RequestHandler(std::string pathTemplate, CallbackT&&... callbacks) : processCallbacks({callbacks...})
     {
         size_t index;
         while (((index = pathTemplate.find("{"))) != std::string::npos)
@@ -28,18 +30,24 @@ public:
 
         DEBUG << "GENERATED TEMPLATE" << pathTemplate;
         path = std::regex(pathTemplate);
-        processCallback = std::move(callback);
-    }
-
-    void process(CallbackType callback)
-    {
-        processCallback = callback;
     }
 
 private:
 
+    static void defaultChecks(HttpRequest &request, HttpResponse &response)
+    {
+        if (request.getContentType() == "application/json")
+        {
+            try {
+                static_cast<void>(request.getBodyJson());
+            } catch (json::parse_error &e) {
+                RequestUtils::send400Json(response, "malformed JSON", "body");
+            }
+        }
+    }
+
     friend class HttpServer;
-    std::optional<CallbackType> prepareCallback(HttpRequest &request)
+    std::optional<CallbackType> prepareCallback(HttpRequest &request) const
     {
         static std::smatch match;
         if (!regex_match(request.getUriBase(), match, path))
@@ -48,10 +56,16 @@ private:
         for (size_t i = 0; i < pathParamsNames.size(); i++)
             request.pathParams[pathParamsNames[i]] = match.str(i + 1);
 
-        return {processCallback};
+        return {[this](HttpRequest &request, HttpResponse &response) {
+            defaultChecks(request, response);
+            for (auto &callback : processCallbacks)
+                if (!response.isReady())
+                    callback(request, response);
+        }};
     }
 
-    CallbackType processCallback;
+
+    std::vector<CallbackType> processCallbacks;
 
     std::vector<std::string> pathParamsNames;
     std::regex path;
