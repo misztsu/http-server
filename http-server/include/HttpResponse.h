@@ -149,7 +149,8 @@ private:
         if (!body.empty())
             rawHeaders["Content-Length"] = std::to_string(body.size());
 
-        rawHeaders["Connection"] = request.getHeader("Connection");
+        if (request.hasHeader("Connection"))
+            rawHeaders["Connection"] = request.getHeader("Connection");
 
         std::string message = "HTTP/1.1 " + statusToLine.at(status) + crlf;
 

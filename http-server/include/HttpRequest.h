@@ -32,6 +32,7 @@ public:
     const std::string &getContentType() const { return rawHeaders.at("Content-type"); }
     Method getmethod() const { return method; }
     using HttpMessage::getHeader;
+    using HttpMessage::hasHeader;
 
 private:
 
