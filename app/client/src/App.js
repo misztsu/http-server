@@ -9,39 +9,60 @@ class App extends React.Component {
     constructor(props) {
         super(props)
 
-        const notes = JSON.parse(localStorage.getItem('notes')) || exampleNotes
 
         this.state = {
             searchText: '',
-            notes: notes,
-            maxId: notes.reduce((max, note) => (note.id > max ? note.id : max), notes[0].id)
+            notes: []
         }
 
         this.handleRefresh = this.handleRefresh.bind(this)
         this.handleAddNote = this.handleAddNote.bind(this)
     }
 
-    handleRefresh() {
-        this.setState({ notes: JSON.parse(localStorage.getItem('notes')) })
+    async componentDidMount() {
+        await this.handleRefresh()
     }
 
-    handleAddNote() {
-        localStorage.setItem('notes', JSON.stringify(
-            JSON.parse(localStorage.getItem('notes')).concat([{
-                id: this.state.maxId + 1,
-                content: ''
-            }])
-        ))
+    async handleRefresh(x) {
+        if (x && x.action) {
+            switch (x.action) {
+                case 'update':
+                    this.setState({
+                        notes: this.state.notes.map(note => note.id === x.id ? {
+                            ...note,
+                            content: x.content
+                        } : note)
+                    })
+                    break;
 
-        this.setState({
-            notes: this.state.notes.concat([{
-                id: this.state.maxId + 1,
-                content: '',
-                expanded: true
-            }])
-        })
+                case 'update':
+                    this.setState({
+                        notes: this.state.notes.filter(note => note.id !== x.id)
+                    })
+                    break;
+            }
+        } else {
+            try {
+                const response = await fetch(`${window.location.href}notes`)
+                if (response.ok)
+                    this.setState({ notes: (await response.json()).map(note => ({ ...note, content: decodeURIComponent(note.content) })) })
+                else
+                    console.error(await response.text())
+            } catch (error) {
+                console.error(error)
+            }
+        }
+    }
 
-        this.setState({ maxId: this.state.maxId + 1 })
+    async handleAddNote() {
+        try {
+            const response = await fetch(`${window.location.href}notes/add`)
+            if (!response.ok)
+                console.error(await response.text())
+            await this.handleRefresh()
+        } catch (error) {
+            console.error(error)
+        }
     }
 
     render() {

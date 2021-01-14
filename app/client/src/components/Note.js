@@ -81,25 +81,38 @@ class Note extends React.Component {
             this.setState({ content: this.props.content })
     }
 
-    expand() {
+    async expand() {
         if (this.state.expanded) {
-            localStorage.setItem('notes', JSON.stringify(
-                JSON.parse(localStorage.getItem('notes')).map(note => note.id == this.props.id ? {
-                    ...note,
-                    content: this.state.content
-                } : note)
-            ))
-            this.props.onRefresh()
+            try {
+                const response = await fetch(`${window.location.href}notes/${this.props.id}/update/${encodeURIComponent(this.state.content)}`)
+                if (response.ok)
+                    this.props.onRefresh({
+                        action: 'update',
+                        id: this.props.id,
+                        content: this.state.content
+                    })
+                else
+                    console.error(await response.text())
+            } catch (error) {
+                console.error(error)
+            }
         }
         this.setState({ expanded: !this.state.expanded })
     }
 
-    delete() {
-        localStorage.setItem('notes', JSON.stringify(
-            JSON.parse(localStorage.getItem('notes')).filter(note => note.id != this.props.id)
-        ))
-        console.log(JSON.parse(localStorage.getItem('notes')))
-        this.props.onRefresh()
+    async delete() {
+        try {
+            const response = await fetch(`${window.location.href}notes/${this.props.id}/delete`)
+            if (response.ok)
+                this.props.onRefresh({
+                    action: 'delete',
+                    id: this.props.id
+                })
+            else
+                console.error(await response.text())
+        } catch (error) {
+            console.error(error)
+        }
     }
 
     render() {
@@ -142,6 +155,7 @@ class Note extends React.Component {
                 </CardActions>
                 <Collapse in={this.state.expanded} timeout="auto" >
                     <MDEditor
+                        key={this.state.content}
                         value={this.state.content}
                         height={240}
                         onChange={content => this.setState({ content: content })}

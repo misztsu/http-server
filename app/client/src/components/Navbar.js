@@ -134,7 +134,17 @@ class Navbar extends React.Component {
                         </List>
                         <Divider />
                         <List>
-                            <ListItem button onClick={() => { localStorage.setItem('notes', JSON.stringify(exampleNotes)); this.props.onRefresh() }}>
+                            <ListItem button onClick={async () => {
+                                try {
+                                    const response = await fetch(`${window.location.href}notes/loadExamples`)
+                                    if (response.ok)
+                                        this.props.onRefresh()
+                                    else
+                                        console.error(await response.text())
+                                } catch (error) {
+                                    console.error(error)
+                                }
+                            }}>
                                 <ListItemIcon><ReplayIcon /></ListItemIcon>
                                 <ListItemText primary={'Load example notes'} />
                             </ListItem>

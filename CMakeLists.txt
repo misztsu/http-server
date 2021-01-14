@@ -1,5 +1,5 @@
 
-cmake_minimum_required(VERSION 3.18.2)
+cmake_minimum_required(VERSION 3.16.3)
 
 project(http-server)
 
@@ -23,3 +23,5 @@ add_executable(server
 )
 
 target_link_libraries(server PRIVATE Threads::Threads)
+
+add_subdirectory(app/server)

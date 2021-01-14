@@ -6,7 +6,9 @@
 #include <utility>
 #include <string>
 
-#define DEBUG Debug() << '[' << std::filesystem::path(__FILE__).filename().string() << __LINE__ << ']'
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define DEBUG Debug() << '[' << std::filesystem::path(__FILE__).filename().string() + ":" TOSTRING(__LINE__) << ']'
 
 class Debug
 {
