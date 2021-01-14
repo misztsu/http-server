@@ -23,13 +23,10 @@ public:
     static RequestHandler::CallbackType pathParamInt(const std::string &param)
     {
         return [=](auto &request, auto &response) {
-            if (verifyRequiredPathParam(request, response, param))
-            {
-                try {
-                    static_cast<void>(std::stoi(request.getPathParam(param)));
-                } catch (std::invalid_argument &e) {
-                    RequestUtils::send400Json(response, "Argument " + param + " should be integer", path, param);
-                }
+            try {
+                static_cast<void>(std::stoi(request.getPathParam(param)));
+            } catch (std::invalid_argument &e) {
+                RequestUtils::send400Json(response, "Argument " + param + " should be integer", path, param);
             }
         };
     }
@@ -56,17 +53,6 @@ public:
     }
 
 private:
-
-    static bool verifyRequiredPathParam(HttpRequest &request, HttpResponse &response, const std::string &name)
-    {
-        if (!request.hasPathParam(name))
-        {
-            RequestUtils::send400Json(response, "Parameter " + name + " required", body, name);
-            return false;
-        }
-        else
-            return true;
-    }
 };
 
 #endif

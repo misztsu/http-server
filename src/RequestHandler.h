@@ -19,20 +19,32 @@ public:
     template <typename... CallbackT>
     RequestHandler(std::string pathTemplate, CallbackT&&... callbacks) : processCallbacks({callbacks...})
     {
-        size_t index;
-        while (((index = pathTemplate.find("{"))) != std::string::npos)
-        {
-            static const std::string replacing = "([^\\/]*)";
-            size_t closing = pathTemplate.find("}");
-            pathParamsNames.push_back(pathTemplate.substr(index + 1, closing - index - 1));
-            pathTemplate.replace(index, closing - index + 1, replacing);
-        }
+        replaceString(pathTemplate, "([^\\/]*)", "{", "}");
+        replaceString(pathTemplate, "(.*)", "<", ">");
+
+        if (pathTemplate[0] != '/')
+            pathTemplate = "/" + std::move(pathTemplate);
 
         DEBUG << "GENERATED TEMPLATE" << pathTemplate;
         path = std::regex(pathTemplate);
     }
 
 private:
+    std::vector<CallbackType> processCallbacks;
+
+    std::vector<std::string> pathParamsNames;
+    std::regex path;
+
+    void replaceString(std::string &pathTemplate, const std::string &replacement, const std::string &opening, const std::string &closing)
+    {
+        size_t index;
+        while (((index = pathTemplate.find(opening))) != std::string::npos)
+        {
+            size_t closingIndex = pathTemplate.find(closing);
+            pathParamsNames.push_back(pathTemplate.substr(index + 1, closingIndex - index - 1));
+            pathTemplate.replace(index, closingIndex - index + 1, replacement);
+        }
+    }
 
     static void defaultChecks(HttpRequest &request, HttpResponse &response)
     {
@@ -63,12 +75,6 @@ private:
                     callback(request, response);
         }};
     }
-
-
-    std::vector<CallbackType> processCallbacks;
-
-    std::vector<std::string> pathParamsNames;
-    std::regex path;
 };
 
 

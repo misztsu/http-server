@@ -24,7 +24,7 @@ add_executable(server
     src/main.cpp
 )
 
-target_link_libraries(server PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(server PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(server PRIVATE Threads::Threads)
 
 add_subdirectory(app/server)

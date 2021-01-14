@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <future>
+#include <fstream>
 #include <utility>
 #include <vector>
 
@@ -54,6 +55,47 @@ public:
         bind<HttpRequest::Method::delet>(std::move(path), std::forward<CallbackT>(callbacks)...);
     }
 
+    std::unordered_map<std::string, std::string> extensionToType = {
+        {".html", "text/html"},
+        {".js", "text/javascript"},
+        {".css", "text/css"},
+        {".ico", "image/x-icon"},
+        {".json", "application/json"}
+    };
+
+    void bindStaticFile(std::string &&path, const std::filesystem::path &filePath)
+    {
+        if (!std::filesystem::is_regular_file(filePath))
+            throw std::runtime_error("file not found");
+        get(std::move(path), [this, filePath] (HttpRequest &request, HttpResponse &response) {
+            sendFile(request, response, filePath);
+        });
+    }
+
+    void bindStaticDirectory(const std::string &path, const std::filesystem::path &baseDir)
+    {
+        if (!std::filesystem::is_directory(baseDir))
+            throw std::runtime_error("baseDir must be a folder");
+        static const std::string paramName = "path343048903816";
+        std::string fullPath = path + ((path.back() == '/') ? "" : "/") + "<" + paramName + ">";
+        get(std::move(fullPath), [this, baseDir] (HttpRequest &request, HttpResponse &response) {
+
+            std::string pathString = request.getPathParam(paramName);
+            if (pathString.find("..") != std::string::npos)
+            {
+                response.setStatus(HttpResponse::Status::Im_a_teapot).setBody(":>");
+                return;
+            }
+
+            if (pathString.empty())
+                pathString = "index.html";
+
+            std::filesystem::path path(pathString);
+            std::filesystem::path fullPath = baseDir / path;
+            sendFile(request, response, fullPath);
+        });
+    }
+
     [[noreturn]]
     void listen(int port = 80)
     {
@@ -76,6 +118,21 @@ private:
         {HttpRequest::Method::delet, {}}
     };
 
+    void sendFile(HttpRequest &request, HttpResponse &response, std::filesystem::path path)
+    {
+        DEBUG << "SENDING FILE" << path;
+        auto status = std::filesystem::status(path);
+        if (status.type() != std::filesystem::file_type::regular) 
+            default404(request, response);
+        else
+        {
+            std::ifstream ifstream(path.native());
+            std::string content = std::string(std::istreambuf_iterator<char>(ifstream), std::istreambuf_iterator<char>());
+            std::string extension = path.extension().native();
+            std::string type = extensionToType.at(extension);
+            response.setStatus(200).setBody(content, type);
+        }
+    }
 
     using OptionalCallback = std::optional<RequestHandler::CallbackType>;
 
@@ -118,13 +175,14 @@ private:
                 iterative_co_await(requestCoroutine);
                 HttpRequest request = requestCoroutine.value();
 
-                DEBUG << "received request" << request.method << request.uriBase;
+                DEBUG << "received request" << request.getMethod() << request.getUriBase();
 
                 auto callback = prepareCallback(request);
 
                 auto response = std::async(std::launch::async, [&](Notify notify) {
                     HttpResponse response(request);
                     try {
+                        DEBUG << "launching callback for " << request.getUriBase();
                         callback(request, response);
                     } catch (const std::exception &e) {
                         fatal500(request, response);

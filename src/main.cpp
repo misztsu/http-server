@@ -13,7 +13,7 @@ int main()
 {
     HttpServer server;
 
-    server.get("/", [](auto &request, auto &response) {
+    server.get("/hello", [](auto &request, auto &response) {
         response.setStatus(200).setBody("Hello");
     });
 
@@ -37,6 +37,8 @@ int main()
             response.setStatus(HttpResponse::Status::Not_Implemented);
         }
     );
+
+    server.bindStaticDirectory("/", "static");
 
     server.listen(3000);
 }
