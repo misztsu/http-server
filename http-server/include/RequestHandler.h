@@ -24,6 +24,8 @@ public:
 
         if (pathTemplate[0] != '/')
             pathTemplate = "/" + std::move(pathTemplate);
+        if (pathTemplate.back() == '/')
+            pathTemplate.pop_back();
 
         DEBUG << "GENERATED TEMPLATE" << pathTemplate;
         path = std::regex(pathTemplate);

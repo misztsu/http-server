@@ -18,7 +18,7 @@ public:
     };
 
     Method getMethod() const { return method; }
-    const std::string &getUriBase() const { return uri; }
+    const std::string &getUriBase() const { return uriBase; }
     const std::string &getQuery() const { return query; }
     const std::string &getHttpVersion() const { return httpVersion; }
     const std::string &getPathParam(const std::string &name) const
@@ -36,7 +36,6 @@ public:
 private:
 
     Method method;
-    std::string uri;
     std::string uriBase;
     std::string query;
     std::string part;
@@ -52,9 +51,10 @@ private:
             throw std::runtime_error("error while parsing URI");
 
         uriBase = match.str(2);
+        if (uriBase.back() == '/')
+            uriBase.pop_back();
         query = match.str(4);
         part = match.str(6);
-        this->uri = std::move(uri);
     }
 
     inline static const std::unordered_map<std::string, Method> toMethod = {

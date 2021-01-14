@@ -1,98 +1,78 @@
 #include <string>
 
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
 #include "HttpServer.h"
+#include "Validators.h"
 #include "User.h"
 
-std::string jsonFromId(int id)
+json jsonFromId(int id)
 {
-    std::string body = "{\n\"id\": ";
-    body.append(std::to_string(id));
-    body.append("\"\n}");
-    return body;
+    return {"id", id};
 }
+
+std::filesystem::path indexHtml = "frontend_static/index.html";
+std::filesystem::path frontEndStatic = "frontend_static/";
 
 int main()
 {
     UserManager userManager;
     HttpServer server;
 
-    server.get("/", [](auto &request, auto &response) {
-        response.setStatus(200);
-        response.setBody("Hello");
+    server.get("/helloworld", [](auto &request, auto &response) {
+        response.setStatus(200).setBody("Hello");
     });
 
-    server.get("/users/{userId}/notes", [&](auto &request, auto &response) {
-        try
-        {
+    for (auto &path : {
+        "/",
+        "/users/{userId}"
+    }) {
+        server.bindStaticFile(path, indexHtml);
+    }
+
+    server.get("/users/{userId}/notes",
+        Validators::pathParamInt("userId"),
+        [&](HttpRequest &request, HttpResponse &response) {
             int userId = std::stoi(request.getPathParam("userId"));
             User &user = userManager.getUser(userId);
 
-            std::string body = "[\n";
+            json body = json::array();
             for (const auto &note : user.getNotes())
-            {
-                body.append("{\n\"id\": ");
-                body.append(std::to_string(note.first));
-                body.append(",\n\"content\": \"");
-                body.append(note.second.getContent());
-                body.append("\"\n},");
-            }
-            body.pop_back();
-            body.append("\n]");
+                body.push_back(json{
+                    {"id", note.first},
+                    {"content", note.second.getContent()}
+                });
 
-            response.setStatus(200);
-            response.setBody(body, "application/json");
+            response.setStatus(200).setJsonBody(body);
         }
-        catch (std::invalid_argument &e)
-        {
-            response.setStatus(HttpResponse::Status::Bad_Request);
-        }
-        catch (std::exception &)
-        {
-            response.setStatus(HttpResponse::Status::Internal_Server_Error);
-        }
-    });
+    );
 
-    server.get("/users/{userId}/notes/add", [&](auto &request, auto &response) {
-        try
-        {
+    server.get("/users/{userId}/notes/add",
+        Validators::pathParamInt("userId"),
+        [&] (auto &request, auto &response) {
             int userId = std::stoi(request.getPathParam("userId"));
             User &user = userManager.getUser(userId);
             auto &note = user.addNote();
 
-            response.setStatus(201);
-            response.setBody(jsonFromId(note.first), "application/json");
+            response.setStatus(201).setJsonBody(jsonFromId(note.first));
         }
-        catch (std::invalid_argument &e)
-        {
-            response.setStatus(HttpResponse::Status::Bad_Request);
-        }
-        catch (std::exception &)
-        {
-            response.setStatus(HttpResponse::Status::Internal_Server_Error);
-        }
-    });
+    );
 
-    server.get("/users/{userId}/notes/{noteId}/delete", [&](auto &request, auto &response) {
-        try
-        {
+    server.get("/users/{userId}/notes/{noteId}/delete",
+        Validators::pathParamInt("userId"),
+        Validators::pathParamInt("noteId"),
+        [&] (auto &request, auto &response) {
             int userId = std::stoi(request.getPathParam("userId"));
             int noteId = std::stoi(request.getPathParam("noteId"));
             User &user = userManager.getUser(userId);
             user.deleteNote(noteId);
 
-            response.setStatus(200);
-            response.setBody(jsonFromId(noteId), "application/json");
+            response.setStatus(200).setJsonBody(jsonFromId(noteId));
         }
-        catch (std::invalid_argument &e)
-        {
-            response.setStatus(HttpResponse::Status::Bad_Request);
-        }
-        catch (std::exception &)
-        {
-            response.setStatus(HttpResponse::Status::Internal_Server_Error);
-        }
-    });
+    );
 
+    // Uhhhh OHHHHH hmmmmmmmmmmmmmmmmmmmmmmmm
     server.get("/users/{userId}/notes/{noteId}/update/{content}", [&](auto &request, auto &response) {
         try
         {
@@ -104,7 +84,7 @@ int main()
             note.setContent(content);
 
             response.setStatus(200);
-            response.setBody(jsonFromId(noteId), "application/json");
+            response.setJsonBody(jsonFromId(noteId));
         }
         catch (std::invalid_argument &e)
         {
@@ -116,43 +96,26 @@ int main()
         }
     });
 
-    server.get("/users/{userId}/notes/loadExamples", [&](auto &request, auto &response) {
-        try
-        {
+    server.get("/users/{userId}/notes/loadExamples",
+        Validators::pathParamInt("userId"),
+        [&] (auto &request, auto &response) {
             int userId = std::stoi(request.getPathParam("userId"));
             User &user = userManager.getUser(userId);
             user.loadExampleNotes();
 
             response.setStatus(200);
-            response.setBody(jsonFromId(userId), "application/json");
+            response.setJsonBody(jsonFromId(userId));
         }
-        catch (std::invalid_argument &e)
-        {
-            response.setStatus(HttpResponse::Status::Bad_Request);
-        }
-        catch (std::exception &)
-        {
-            response.setStatus(HttpResponse::Status::Internal_Server_Error);
-        }
-    });
+    );
 
     server.get("/users/add", [&](auto &request, auto &response) {
-        try
-        {
-            auto &user = userManager.addUser();
+        auto &user = userManager.addUser();
 
-            response.setStatus(201);
-            response.setBody(jsonFromId(user.first), "application/json");
-        }
-        catch (std::invalid_argument &e)
-        {
-            response.setStatus(HttpResponse::Status::Bad_Request);
-        }
-        catch (std::exception &)
-        {
-            response.setStatus(HttpResponse::Status::Internal_Server_Error);
-        }
+        response.setStatus(201);
+        response.setJsonBody(jsonFromId(user.first));
     });
 
-    server.listen(3001);
+    server.bindStaticDirectory("/", frontEndStatic);
+
+    server.listen(3000);
 }

@@ -60,7 +60,8 @@ public:
         {".js", "text/javascript"},
         {".css", "text/css"},
         {".ico", "image/x-icon"},
-        {".json", "application/json"}
+        {".json", "application/json"},
+        {".map", "application/octet-stream"}
     };
 
     void bindStaticFile(std::string &&path, const std::filesystem::path &filePath)
@@ -225,7 +226,7 @@ private:
 
     static void fatal500(HttpRequest &request, HttpResponse &response)
     {
-        DEBUG << "UNHANDLED EXCEPTION WHILE PROCESSING" << request.method << request.uri;
+        DEBUG << "UNHANDLED EXCEPTION WHILE PROCESSING" << request.method << request.getUriBase();
         response.setStatus(500);
         response.setBody("<h1>500</h1> Unhandled exception happended while processing the request <br/> :(");
     }
