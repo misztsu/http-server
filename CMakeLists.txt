@@ -20,11 +20,5 @@ add_subdirectory(thirdparty/json)
 add_compile_options(-Wall -Wextra -pedantic -Wno-unused-parameter)
 add_compile_options(-fcoroutines)
 
-add_executable(server
-    src/main.cpp
-)
-
-target_link_libraries(server PUBLIC nlohmann_json::nlohmann_json)
-target_link_libraries(server PRIVATE Threads::Threads)
-
+add_subdirectory(http-server)
 add_subdirectory(app/server)
