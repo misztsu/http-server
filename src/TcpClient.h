@@ -46,6 +46,13 @@ public:
             error("connect");
         }
     }
+    class ConnectionClosedException : public std::exception
+    {
+        virtual const char* what() const noexcept override
+        {
+            return "Connection closed";
+        }
+    };
 
     Coroutine<void> send(const std::string &buff)
     {
@@ -94,6 +101,10 @@ public:
         }
         else
             error("recv");
+
+        if (buff.empty())
+            throw ConnectionClosedException();
+
         co_return buff;
     }
 

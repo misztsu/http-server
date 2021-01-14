@@ -3,6 +3,7 @@
 
 #include <coroutine>
 #include <regex>
+#include <string>
 
 #include "Coroutine.h"
 #include "HttpMessage.h"
@@ -13,9 +14,10 @@ class HttpRequest : public HttpMessage
 public:
     enum Method
     {
-        get
+        get, head, post, put, delet
     };
 
+    Method getMethod() const { return method; }
     const std::string &getUriBase() const { return uri; }
     const std::string &getQuery() const { return query; }
     const std::string &getHttpVersion() const { return httpVersion; }
@@ -23,6 +25,11 @@ public:
     {
         return pathParams.at(name);
     }
+    bool hasPathParam(const std::string &name) const
+    {
+        return pathParams.find(name) != pathParams.end();
+    }
+    const std::string &getContentType() const { return rawHeaders.at("Content-type"); }
     Method getmethod() const { return method; }
     using HttpMessage::getHeader;
 
@@ -51,8 +58,14 @@ private:
     }
 
     inline static const std::unordered_map<std::string, Method> toMethod = {
-        {"GET", get}
+        {"GET", get},
+        {"HEAD", head},
+        {"POST", post},
+        {"PUT", put},
+        {"DELETE", delet}
     };
+
+    inline static std::string noContentTypeString = "UNKNOWN_CONTENT_TYPE";
 
     void setRequestLine(const std::string& line)
     {
@@ -94,16 +107,37 @@ private:
             else
             {
                 int splitIndex = line.find(':');
-                lastHeader = line.substr(0, splitIndex - 1);
+                lastHeader = line.substr(0, splitIndex);
                 request.rawHeaders[lastHeader] += line.substr(splitIndex + 1);
             }
         }
 
         for (auto &[key, value] : request.rawHeaders)
             value = removeWhitespaces(std::move(value));
-        
-        // TODO fetch request body
 
+        if (request.method != head && request.method != get)
+        {
+            // TODO server MUST support chunked transfer encoding
+            if (request.hasHeader("Content-Length"))
+            {
+                size_t bodyLength = size_t(std::stoi(request.getHeader("Content-Length")));
+                while (buffer.size() < bodyLength)
+                {
+                    auto readCoroutine = tcpClient.receive();
+                    iterative_co_await(readCoroutine);
+                    buffer += readCoroutine.value();
+                }
+
+                request.body = buffer.substr(0, bodyLength);
+                buffer.erase(0, bodyLength);
+
+                DEBUG << "body fetched:" << request.body;
+            }
+        }
+
+        if (request.rawHeaders.find("Content-type") == request.rawHeaders.end())
+            request.rawHeaders.insert({"Content-type", noContentTypeString});
+        
         co_return request;
     }
 
