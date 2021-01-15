@@ -31,11 +31,15 @@ public:
     }
     const std::string &getContentType() const { return rawHeaders.at("Content-type"); }
     Method getmethod() const { return method; }
+    bool hasCookie(const std::string &name) const
+    {
+        return cookies.find(name) != cookies.end();
+    }
+    const std::string &getCookie(const std::string &name) const {return cookies.at(name); }
     using HttpMessage::getHeader;
     using HttpMessage::hasHeader;
 
 private:
-
     Method method;
     std::string uriBase;
     std::string query;
@@ -43,6 +47,7 @@ private:
     std::string httpVersion;
 
     std::unordered_map<std::string, std::string> pathParams;
+    std::unordered_map<std::string, std::string> cookies;
 
     void setUri(std::string&& uri)
     {
@@ -63,8 +68,7 @@ private:
         {"HEAD", head},
         {"POST", post},
         {"PUT", put},
-        {"DELETE", delet}
-    };
+        {"DELETE", delet}};
 
     inline static std::string noContentTypeString = "UNKNOWN_CONTENT_TYPE";
 
@@ -82,7 +86,7 @@ private:
     {
         // TODO proper error handling -> server MUST return 400 on malformed request
         size_t headerEnd;
-        while(((headerEnd = buffer.find(crlf2, headerEnd))) == std::string::npos)
+        while (((headerEnd = buffer.find(crlf2, headerEnd))) == std::string::npos)
         {
             headerEnd = buffer.size();
             auto readCoroutine = tcpClient.receive();
@@ -138,7 +142,16 @@ private:
 
         if (request.rawHeaders.find("Content-type") == request.rawHeaders.end())
             request.rawHeaders.insert({"Content-type", noContentTypeString});
-        
+
+        if (request.hasHeader("Cookie"))
+        {
+            static std::regex cookieRegex("([a-zA-Z0-9!#$%^&*'~\\-._+`|]*)=(.*?)($|;|,(?! ))");
+            auto begin = std::sregex_iterator(request.getHeader("Cookie").begin(), request.getHeader("Cookie").end(), cookieRegex);
+            auto end = std::sregex_iterator();
+            for (std::sregex_iterator it = begin; it != end; it++)
+                request.cookies[(*it)[1]] = (*it)[2];
+        }
+
         co_return request;
     }
 
@@ -172,6 +185,5 @@ private:
     friend class HttpServer;
     friend class RequestHandler;
 };
-
 
 #endif

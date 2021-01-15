@@ -10,7 +10,7 @@
 
 class HttpResponse : public HttpMessage
 {
-    
+
 public:
     enum Status
     {
@@ -126,6 +126,20 @@ public:
         setBody(jsonBody.dump(), "application/json");
         return *this;
     }
+    HttpResponse & setCookie(const std::string &name, const std::string &value, const std::string &expirationDate = "", const std::string &path = "/")
+    {
+        std::string cookie = name + "=" + value + "; path=" + path;
+        if (!expirationDate.empty())
+            cookie.append("; Expires=" + expirationDate);
+        setHeader("Set-Cookie", cookie);
+        return *this;
+    }
+    HttpResponse & deleteCookie(const std::string &name, const std::string &path = "/")
+    {
+        setCookie(name, "deleted", "Thu, 01 Jan 1970 00:00:00 GMT", path);
+        return *this;
+    }
+    using HttpMessage::setHeader;
 
     void send()
     {
@@ -133,7 +147,6 @@ public:
     }
 
 private:
-
     HttpResponse(HttpRequest &request, Status status = OK) : request(request), status(status) {}
 
     HttpRequest &request;
@@ -156,9 +169,9 @@ private:
 
         for (auto &[header, value] : rawHeaders)
             message += header + ": " + value + crlf;
-        
+
         message += crlf;
-        
+
         if (request.getMethod() != HttpRequest::Method::head)
             message += body;
 

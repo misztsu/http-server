@@ -19,14 +19,32 @@ public:
     template <class T>
     Debug &operator<<(T &&t)
     {
-        std::cerr << std::forward<T>(t) << ' ';
+        std::cout << std::forward<T>(t) << ' ';
         return *this;
     }
 
     ~Debug()
     {
-        std::cerr << std::endl;
+        std::cout << std::endl;
     }
+
+    static void pushColor(uint8_t color)
+    {
+        std::cout << "\033[38;5;" << +color << "m";
+        colors.push(color);
+    }
+    static void popColor()
+    {
+        if (!colors.empty())
+            colors.pop();
+        if (!colors.empty())
+            std::cout << "\033[38;5;" << +colors.top() << "m";
+        else
+            std::cout << "\033[0m";
+    }
+
+private:
+    static inline std::stack<uint8_t> colors;
 };
 
 #endif /* DEBUG_H */

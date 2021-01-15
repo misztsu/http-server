@@ -57,7 +57,7 @@ public:
     Coroutine<void> send(const std::string &buff)
     {
         size_t length = 0;
-        DEBUG << "sending" << buff.size() << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
+        DEBUG << "sending" << buff.size() << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 16UL)) << "... on socket" << socket;
         while (length != buff.size())
         {
             do
@@ -96,7 +96,7 @@ public:
 
         if (code != errorCode)
         {
-            DEBUG << "received" << length << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 6UL)) << "... on socket" << socket;
+            DEBUG << "received" << length << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 16UL)) << "... on socket" << socket;
             buff.resize(length);
         }
         else
