@@ -66,7 +66,6 @@ public:
     }
 
 private:
-
     Notify(int efd) : efd(efd) {}
 
     static void close(FileDescriptor efd)
@@ -120,6 +119,8 @@ public:
         }
 
         task.resume();
+        if (task.hasValue())
+            task.value();
 
         auto it = tasks.find(socket);
         if (it != tasks.end())
@@ -156,6 +157,9 @@ public:
         {
             DEBUG << "Resuming task for descriptor" << descriptors.socket;
             it->second.resume();
+            if (it->second.hasValue())
+                it->second.value();
+                
             if (it->second)
             {
                 DEBUG << "socket" << it->first << "erased from epoll manager";

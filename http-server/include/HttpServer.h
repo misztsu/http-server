@@ -67,7 +67,7 @@ public:
     void bindStaticFile(std::string &&path, const std::filesystem::path &filePath)
     {
         if (!std::filesystem::is_regular_file(filePath))
-            throw std::runtime_error("file not found");
+            throw std::runtime_error("file" + filePath.string() + "not found");
         get(std::move(path), [this, filePath] (HttpRequest &request, HttpResponse &response) {
             sendFile(request, response, filePath);
         });
