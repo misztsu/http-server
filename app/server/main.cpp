@@ -28,7 +28,7 @@ int main()
 
     server.post("/users/add",
                 Validators::bodyRegex("/userId"_json_pointer, std::regex("^\\w+$")),
-                Validators::bodyRegex("/hash"_json_pointer, std::regex("^\\w+$")),
+                Validators::bodyRegex("/hash"_json_pointer, std::regex("[^]+$")),
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
                     auto hash = request.getBodyJson()["/hash"_json_pointer].get<std::string>();
@@ -45,9 +45,9 @@ int main()
 
     server.post("/users/login",
                 Validators::bodyRegex("/userId"_json_pointer, std::regex("^\\w+$")),
-                Validators::bodyRegex("/hash"_json_pointer, std::regex("^\\w+$")),
+                Validators::bodyRegex("/hash"_json_pointer, std::regex("[^]+$")),
                 [&](HttpRequest &request, HttpResponse &response) {
-                    auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
+                   auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
                     auto hash = request.getBodyJson()["/hash"_json_pointer].get<std::string>();
                     if (!userManager.hasUser(userId))
                     {

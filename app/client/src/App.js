@@ -1,80 +1,148 @@
+import { withSnackbar } from 'notistack';
 import React from 'react';
+import { Redirect, Route, Switch } from 'react-router-dom';
 import Feed from './components/Feed';
+import Login from './components/Login';
+import LoginHandler from './components/LoginHandler';
+import LogoutHandler from './components/LogoutHandler';
 import Navbar from './components/Navbar';
 import Scrollable from './components/Scrollable';
-import exampleNotes from './exampleNotes';
+import SharedNoteHandler from './components/SharedNoteHandler';
 
 class App extends React.Component {
 
     constructor(props) {
         super(props)
 
-
         this.state = {
             searchText: '',
-            notes: []
+            notes: [],
+            sharedNotes: [],
+            userId: localStorage.getItem('userId') || ''
         }
 
         this.handleRefresh = this.handleRefresh.bind(this)
         this.handleAddNote = this.handleAddNote.bind(this)
+        this.handleAddSharedNote = this.handleAddSharedNote.bind(this)
+        this.handleUser = this.handleUser.bind(this)
     }
 
-    async componentDidMount() {
-        await this.handleRefresh()
-    }
-
-    async handleRefresh(x) {
-        if (x && x.action) {
-            switch (x.action) {
+    async handleRefresh(command) {
+        if (command && command.action) {
+            switch (command.action) {
                 case 'update':
                     this.setState({
-                        notes: this.state.notes.map(note => note.id === x.id ? {
+                        notes: this.state.notes.map(note => note.noteId === command.noteId ? {
                             ...note,
-                            content: x.content
+                            content: command.content
                         } : note)
                     })
                     break;
 
-                case 'update':
+                case 'delete':
                     this.setState({
-                        notes: this.state.notes.filter(note => note.id !== x.id)
+                        notes: this.state.notes.filter(note => note.noteId !== command.noteId)
                     })
                     break;
+
+                case 'add':
+                    this.setState({
+                        notes: this.state.notes.concat([{ ...command, action: undefined }])
+                    })
+                    break;
+
+                case 'addShared':
+                    this.setState({
+                        sharedNotes: this.state.sharedNotes.concat([{ ...command, action: undefined, shared: true }])
+                    })
+                    console.log(this.state.sharedNotes)
+                    break;
             }
-        } else {
+        } else if (this.state.userId) {
             try {
-                const response = await fetch(`${window.location.href}notes`)
-                if (response.ok)
-                    this.setState({ notes: (await response.json()).map(note => ({ ...note, content: decodeURIComponent(note.content) })) })
-                else
-                    console.error(await response.text())
+                const response = await fetch(`/users/${this.state.userId}/notes`, {
+                    method: 'GET'
+                })
+                const body = await response.json()
+                if (response.status == 200) {
+                    this.setState({ notes: (await body).sort((a, b) => a.noteId - b.noteId).map(note => ({ ...note, content: note.content })) })
+                } else {
+                    console.warn(body)
+                    this.props.enqueueSnackbar(body.message, { variant: 'error' })
+                }
             } catch (error) {
                 console.error(error)
+                this.props.enqueueSnackbar('Error.', { variant: 'error' })
             }
         }
     }
 
     async handleAddNote() {
         try {
-            const response = await fetch(`${window.location.href}notes/add`)
-            if (!response.ok)
-                console.error(await response.text())
-            await this.handleRefresh()
+            const response = await fetch(`/users/${this.state.userId}/notes/add`, {
+                method: 'GET'
+            })
+            const body = await response.json()
+            if (response.status == 201) {
+                await this.handleRefresh({ action: 'add', userId: this.state.userId, noteId: body.noteId, expanded: true })
+            } else {
+                console.warn(body)
+                this.props.enqueueSnackbar(body.message, { variant: 'error' })
+            }
         } catch (error) {
             console.error(error)
+            this.props.enqueueSnackbar('Error.', { variant: 'error' })
         }
+    }
+
+    async handleAddSharedNote(note) {
+        try {
+            const response = await fetch(`/users/${note.userId}/notes/${note.noteId}`, {
+                method: 'GET'
+            })
+            const body = await response.json()
+            if (response.status == 200) {
+                await this.handleRefresh({ action: 'addShared', userId: body.userId, noteId: body.noteId, content: body.content })
+            } else {
+                console.warn(body)
+                this.props.enqueueSnackbar(body.message, { variant: 'error' })
+            }
+        } catch (error) {
+            console.error(error)
+            this.props.enqueueSnackbar('Error.', { variant: 'error' })
+        }
+    }
+
+    async handleUser(userId) {
+        localStorage.setItem('userId', userId)
+        this.setState({ userId: userId })
+        await this.handleRefresh()
     }
 
     render() {
         return (
             <>
-                <Scrollable>
-                    <Feed notes={this.state.notes} onRefresh={this.handleRefresh} searchText={this.state.searchText} />
-                </Scrollable>
-                <Navbar onRefresh={this.handleRefresh} onAdd={this.handleAddNote} onSearchText={searchText => this.setState({ searchText: searchText })} />
+                <LogoutHandler />
+                <Switch>
+                    <Route exact path="/login">
+                        <Login onUser={this.handleUser} />
+                    </Route>
+                    <Route exact path="/shared/:userId/:noteId" render={(props) =>
+                        <SharedNoteHandler onAddSharedNote={this.handleAddSharedNote} {...props} />
+                    }>
+                    </Route>
+                    <Route exact path="/">
+                        <LoginHandler onRefresh={this.handleRefresh} />
+                        <Scrollable>
+                            <Feed notes={this.state.notes.concat(this.state.sharedNotes)} onRefresh={this.handleRefresh} searchText={this.state.searchText} />
+                        </Scrollable>
+                        <Navbar userId={this.state.userId} onUser={this.handleUser} onRefresh={this.handleRefresh} onAddNote={this.handleAddNote} onAddSharedNote={this.handleAddSharedNote} onSearchText={searchText => this.setState({ searchText: searchText })} />
+                    </Route>
+                    <Redirect to="/" />
+                </Switch>
             </>
         )
     }
 }
 
-export default App
+export default withSnackbar(App)

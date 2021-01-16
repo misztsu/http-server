@@ -1,22 +1,32 @@
-import { Link } from '@material-ui/core'
-import Box from '@material-ui/core/Box'
-import ButtonBase from '@material-ui/core/ButtonBase'
-import Card from '@material-ui/core/Card'
-import CardActions from '@material-ui/core/CardActions'
-import CardContent from '@material-ui/core/CardContent'
-import Checkbox from '@material-ui/core/Checkbox'
-import Collapse from '@material-ui/core/Collapse'
-import Divider from '@material-ui/core/Divider'
-import IconButton from '@material-ui/core/IconButton'
-import { withStyles } from '@material-ui/core/styles'
-import Typography from '@material-ui/core/Typography'
-import DeleteIcon from '@material-ui/icons/Delete'
-import EditIcon from '@material-ui/icons/Edit'
-import SaveIcon from '@material-ui/icons/Save'
-import MDEditor from '@uiw/react-md-editor'
-import React from 'react'
-import ReactMarkdown from 'react-markdown'
-import gfm from 'remark-gfm'
+import { Link } from '@material-ui/core';
+import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
+import ButtonBase from '@material-ui/core/ButtonBase';
+import Card from '@material-ui/core/Card';
+import CardActions from '@material-ui/core/CardActions';
+import CardContent from '@material-ui/core/CardContent';
+import Checkbox from '@material-ui/core/Checkbox';
+import Collapse from '@material-ui/core/Collapse';
+import Dialog from '@material-ui/core/Dialog';
+import DialogActions from '@material-ui/core/DialogActions';
+import DialogContent from '@material-ui/core/DialogContent';
+import DialogContentText from '@material-ui/core/DialogContentText';
+import DialogTitle from '@material-ui/core/DialogTitle';
+import Divider from '@material-ui/core/Divider';
+import IconButton from '@material-ui/core/IconButton';
+import { withStyles } from '@material-ui/core/styles';
+import TextField from '@material-ui/core/TextField';
+import Typography from '@material-ui/core/Typography';
+import CloudIcon from '@material-ui/icons/Cloud';
+import DeleteIcon from '@material-ui/icons/Delete';
+import EditIcon from '@material-ui/icons/Edit';
+import SaveIcon from '@material-ui/icons/Save';
+import ShareIcon from '@material-ui/icons/Share';
+import MDEditor from '@uiw/react-md-editor';
+import React from 'react';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
+import ReactMarkdown from 'react-markdown';
+import gfm from 'remark-gfm';
 
 const useStyles = (theme) => ({
     content: {
@@ -68,7 +78,9 @@ class Note extends React.Component {
 
         this.state = {
             expanded: props.expanded,
-            content: props.content
+            content: props.content,
+            key: 0,
+            copySharedNoteUrl: false
         }
 
         this.expand = this.expand.bind(this)
@@ -78,23 +90,35 @@ class Note extends React.Component {
 
     componentDidUpdate(prevProps) {
         if (this.props.content !== prevProps.content)
-            this.setState({ content: this.props.content })
+            this.setState({ content: this.props.content, key: this.state.key + 1 })
     }
 
     async expand() {
         if (this.state.expanded) {
             try {
-                const response = await fetch(`${window.location.href}notes/${this.props.id}/update/${encodeURIComponent(this.state.content)}`)
-                if (response.ok)
-                    this.props.onRefresh({
-                        action: 'update',
-                        id: this.props.id,
+                const response = await fetch(`/users/${this.props.userId}/notes/${this.props.noteId}/update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
                         content: this.state.content
                     })
-                else
-                    console.error(await response.text())
+                })
+                const body = await response.json()
+                if (response.status == 200) {
+                    this.props.onRefresh({
+                        action: 'update',
+                        noteId: this.props.noteId,
+                        content: this.state.content
+                    })
+                } else {
+                    console.warn(body)
+                    this.props.enqueueSnackbar(body.message, { variant: 'error' })
+                }
             } catch (error) {
                 console.error(error)
+                this.props.enqueueSnackbar('Error.', { variant: 'error' })
             }
         }
         this.setState({ expanded: !this.state.expanded })
@@ -102,16 +126,22 @@ class Note extends React.Component {
 
     async delete() {
         try {
-            const response = await fetch(`${window.location.href}notes/${this.props.id}/delete`)
-            if (response.ok)
+            const response = await fetch(`/users/${this.props.userId}/notes/${this.props.noteId}/delete`, {
+                method: 'GET'
+            })
+            const body = await response.json()
+            if (response.status == 200) {
                 this.props.onRefresh({
                     action: 'delete',
-                    id: this.props.id
+                    noteId: this.props.noteId
                 })
-            else
-                console.error(await response.text())
+            } else {
+                console.warn(body)
+                this.props.enqueueSnackbar(body.message, { variant: 'error' })
+            }
         } catch (error) {
             console.error(error)
+            this.props.enqueueSnackbar('Error.', { variant: 'error' })
         }
     }
 
@@ -144,18 +174,28 @@ class Note extends React.Component {
                 </ButtonBase>
                 <CardActions disableSpacing>
 
-                    <IconButton onClick={this.like} onClick={this.delete}>
+                    <IconButton onClick={this.delete}>
                         <DeleteIcon />
+                    </IconButton>
+
+                    <IconButton onClick={() => this.setState({ copySharedNoteUrl: true })}>
+                        <ShareIcon />
                     </IconButton>
 
                     <IconButton onClick={this.expand}>
                         {this.state.expanded ? <SaveIcon /> : <EditIcon />}
                     </IconButton>
 
+                    {!this.props.shared ? null :
+                        <IconButton fontSize="small" color="primary" onClick={() => this.setState({ copySharedNoteUrl: true })}>
+                            <CloudIcon fontSize="small" />
+                        </IconButton>
+                    }
+
                 </CardActions>
                 <Collapse in={this.state.expanded} timeout="auto" >
                     <MDEditor
-                        key={this.state.content}
+                        key={this.state.key}
                         value={this.state.content}
                         height={240}
                         onChange={content => this.setState({ content: content })}
@@ -163,6 +203,32 @@ class Note extends React.Component {
                         className={classes.editor}
                     />
                 </Collapse>
+
+                <Dialog onClose={() => this.setState({ copySharedNoteUrl: false })} open={this.state.copySharedNoteUrl}>
+                    <DialogTitle>Share with others</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Anyone with this link can view, edit and delete this note. Be careful!
+                        </DialogContentText>
+                        <TextField
+                            autoFocus
+                            value={`${window.location.origin}/shared/${this.props.userId}/${this.props.noteId}`}
+                            onChange={() => { }}
+                            margin="dense"
+                            variant="outlined"
+                            label="Url"
+                            fullWidth
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => this.setState({ copySharedNoteUrl: false })}>Cancel</Button>
+                        <CopyToClipboard text={`${window.location.origin}/shared/${this.props.userId}/${this.props.noteId}`}
+                            onCopy={() => this.setState({ copySharedNoteUrl: false })}>
+                            <Button color="primary">Copy</Button>
+                        </CopyToClipboard>
+                    </DialogActions>
+                </Dialog>
+
             </Card >
         )
     }
