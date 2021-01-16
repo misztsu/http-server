@@ -98,7 +98,7 @@ private:
         {head, "HEAD"},
         {put, "PUT"},
         {post, "POST"},
-        {delet, "DELET"}
+        {delet, "DELETE"}
     };
 
     void parseRequestLine(const std::string& line)
@@ -137,6 +137,7 @@ private:
         DEBUG << "header fetched";
         std::string header = buffer.substr(0, headerEnd + crlf.size());
         buffer = buffer.substr(headerEnd + crlf2.size());
+        
         DEBUG << header;
 
         HttpRequest request;

@@ -31,6 +31,9 @@ public:
     }
 
 protected:
+
+    HttpMessage(std::unordered_map<std::string, std::string> defaultHeaders = {}) : rawHeaders(std::move(defaultHeaders)) {}
+
     std::unordered_map<std::string, std::string> rawHeaders;
     std::string body;
     std::optional<json> jsonBody = {};

@@ -208,5 +208,8 @@ int main()
 
     server.bindStaticDirectory("/", frontEndStatic);
 
+    // for testing frontend on development server
+    // server.addAccessControllAllowOrigin("*");
+
     server.listen(3001);
 }

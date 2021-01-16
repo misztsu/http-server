@@ -152,7 +152,7 @@ public:
     }
 
 private:
-    HttpResponse(HttpRequest &request, Status status = OK) : request(request), status(status) {}
+    HttpResponse(HttpRequest &request, std::unordered_map<std::string, std::string> defaultHeaders = {}, Status status = OK) : HttpMessage(std::move(defaultHeaders)), request(request), status(status) {}
 
     HttpRequest &request;
     Status status;
@@ -179,6 +179,8 @@ private:
 
         if (request.getMethod() != HttpRequest::Method::head)
             message += body;
+        
+        DEBUG << message;
 
         auto sendCoroutine = tcpClient.send(message);
         iterative_co_await(sendCoroutine);

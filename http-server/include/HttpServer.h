@@ -108,8 +108,19 @@ public:
         tcpServer.waitForever();
     }
 
+    void addAccessControllAllowOrigin(const std::string &host)
+    {
+        if (defalutHeaders.find(accessControllAllowOrigin) != defalutHeaders.end())
+            defalutHeaders[accessControllAllowOrigin] += ", ";
+        defalutHeaders[accessControllAllowOrigin] += host;
+    }
+
 private:
     TcpServer tcpServer;
+
+    std::unordered_map<std::string, std::string> defalutHeaders;
+
+    inline static const std::string accessControllAllowOrigin = "Access-Control-Allow-Origin";
 
     std::unordered_map<HttpRequest::Method, std::vector<RequestHandler>> handlers = {
         {HttpRequest::Method::get, {}},
@@ -176,7 +187,7 @@ private:
                 iterative_co_await(requestCoroutine);
 
                 HttpRequest request = requestCoroutine.value();
-                HttpResponse response(request);
+                HttpResponse response(request, defalutHeaders);
                 DEBUG << "received request" << request.getMethod() << request.getUriBase();
 
                 if (request.isMalformed())
@@ -252,11 +263,9 @@ private:
             std::string allow = "";
             for (const auto &[method, methodString] : HttpRequest::methodToString)
             {
-                request.method = method;
-                if (prepareCallback(request))
+                if (prepareCallbackForMethod(request, method))
                     allow += methodString + ", ";
             }
-            request.method = HttpRequest::Method::options;
             if (allow.empty())
                 default404(request, response);
             else
@@ -265,6 +274,10 @@ private:
                 response.setStatus(200).setHeader("Allow", allow);
             }
         }
+        if (request.hasHeader("Access-Control-Request-Headers"))
+            response.setHeader("Access-Control-Allow-Headers", request.getHeader("Access-Control-Request-Headers"));
+        if (request.hasHeader("Access-Control-Request-Methods"))
+            response.setHeader("Access-Control-Allow-Methods", request.getHeader("Access-Control-Request-Methods"));
     }
 
     static void handleTrace(HttpRequest &request, HttpResponse &response)
