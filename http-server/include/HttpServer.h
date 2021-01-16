@@ -67,7 +67,7 @@ public:
     void bindStaticFile(std::string &&path, const std::filesystem::path &filePath)
     {
         if (!std::filesystem::is_regular_file(filePath))
-            throw std::runtime_error("file" + filePath.string() + "not found");
+            throw std::runtime_error("file " + filePath.string() + " not found");
         get(std::move(path), [this, filePath] (HttpRequest &request, HttpResponse &response) {
             sendFile(request, response, filePath);
         });
@@ -174,37 +174,41 @@ private:
             {
                 auto requestCoroutine = HttpRequest::fetchRequest(tcpClient, buffer);
                 iterative_co_await(requestCoroutine);
-                HttpRequest request = requestCoroutine.value();
 
+                HttpRequest request = requestCoroutine.value();
+                HttpResponse response(request);
                 DEBUG << "received request" << request.getMethod() << request.getUriBase();
 
-                auto callback = prepareCallback(request);
+                if (request.isMalformed())
+                    handleMalformed(response);
+                else if (request.getMethod() == HttpRequest::Method::trace)
+                    handleTrace(request, response);
+                else if (request.getMethod() == HttpRequest::Method::options)
+                    handleOptions(request, response);
+                else
+                {
+                    auto callback = prepareCallback(request);
 
-                auto response = std::async(std::launch::async, [&](Notify notify) {
-                    HttpResponse response(request);
-                    try {
-                        DEBUG << "launching callback for " << request.getUriBase();
-                        callback(request, response);
-                    } catch (const std::exception &e) {
-                        fatal500(request, response);
-                        DEBUG << "what():" << e.what();
-                    } catch (...) {
-                        fatal500(request, response);
-                        DEBUG << "NOT EVEN DERIVED FROM std::exception";
-                    }
+                    auto responsePromise = std::async(std::launch::async, [&](Notify notify) {
+                        try {
+                            DEBUG << "launching callback for " << request.getUriBase();
+                            callback(request, response);
+                        } catch (const std::exception &e) {
+                            fatal500(request, response);
+                            DEBUG << "what():" << e.what();
+                        } catch (...) {
+                            fatal500(request, response);
+                            DEBUG << "NOT EVEN DERIVED FROM std::exception";
+                        }
+                    }, notify.createCopy());
+                    co_await std::suspend_always();
+                    responsePromise.wait();
+                }
 
-                    //TODO DELETE THIS
-                    std::this_thread::sleep_for(std::chrono::milliseconds(60)); // simulate blocking operation
-                    DEBUG << "Response callback ending";
+                keepConnection = response.isPersistentConnection();
 
-                    return response;
-                }, notify.createCopy());
-                co_await std::suspend_always();
-
-                auto sendCoroutine = response.get().send(tcpClient);
+                auto sendCoroutine = response.send(tcpClient);
                 iterative_co_await(sendCoroutine);
-
-                keepConnection = request.isPersistentConnection();
             }
         } catch (TcpClient::ConnectionClosedException &ignored)
         {
@@ -229,6 +233,43 @@ private:
         DEBUG << "UNHANDLED EXCEPTION WHILE PROCESSING" << request.method << request.getUriBase();
         response.setStatus(500);
         response.setBody("<h1>500</h1> Unhandled exception happended while processing the request <br/> :(");
+    }
+
+    static void handleMalformed(HttpResponse &response)
+    {
+        DEBUG << "malformed request";
+        response.setStatus(400).setBody("Request format is malformed and could not be at all interpreted").closeConnection();
+    }
+
+    void handleOptions(HttpRequest &request, HttpResponse &response)
+    {
+        if (request.getUriBase() == "*")
+        {
+            response.setStatus(200).setHeader("Allow", "GET, HEAD, PUT, POST, DELETE");
+        }
+        else
+        {
+            std::string allow = "";
+            for (const auto &[method, methodString] : HttpRequest::methodToString)
+            {
+                request.method = method;
+                if (prepareCallback(request))
+                    allow += methodString + ", ";
+            }
+            request.method = HttpRequest::Method::options;
+            if (allow.empty())
+                default404(request, response);
+            else
+            {
+                allow.erase(allow.size() - 2);
+                response.setStatus(200).setHeader("Allow", allow);
+            }
+        }
+    }
+
+    static void handleTrace(HttpRequest &request, HttpResponse &response)
+    {
+        response.setStatus(200).setBody(request.getUnparsedHeader(), "message/http");
     }
 
 };

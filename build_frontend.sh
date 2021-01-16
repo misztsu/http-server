@@ -1,6 +1,10 @@
 #!/bin/bash
 
-npm --prefix app/client/ run build
-rm -vrf bin/frontend_static/
-mkdir -p bin/frontend_static/
-cp -vr app/client/build/* bin/frontend_static/
+app_folder=app/client
+static_folder=bin/frontend_static
+
+npm --prefix $app_folder install
+npm --prefix $app_folder run build
+rm -vrf $static_folder
+mkdir -p $static_folder
+cp -vr $app_folder/build/* $static_folder

@@ -14,7 +14,7 @@ class HttpRequest : public HttpMessage
 public:
     enum Method
     {
-        get, head, post, put, delet
+        get, head, post, put, delet, options, trace
     };
 
     Method getMethod() const { return method; }
@@ -35,32 +35,53 @@ public:
     {
         return cookies.find(name) != cookies.end();
     }
-    const std::string &getCookie(const std::string &name) const {return cookies.at(name); }
+    const std::string &getCookie(const std::string &name) const { return cookies.at(name); }
+    bool isMalformed() { return malformed; }
     using HttpMessage::getHeader;
     using HttpMessage::hasHeader;
 
+    inline static const std::string noContentTypeString = "UNKNOWN_CONTENT_TYPE";
+
 private:
+
+    bool malformed = false;
+
     Method method;
     std::string uriBase;
     std::string query;
     std::string part;
     std::string httpVersion;
 
+    std::string unparsedHeader;
+    const std::string &getUnparsedHeader()
+    {
+        return unparsedHeader;
+    }
+
     std::unordered_map<std::string, std::string> pathParams;
     std::unordered_map<std::string, std::string> cookies;
 
     void setUri(std::string&& uri)
     {
+        // special case allowed only for OPTIONS requests
+        if (method == Method::options && uri == "*")
+        {
+            uriBase = uri;
+            return;
+        }
+
         static const std::regex uriRegex{"(.*:\\/\\/[^\\/]*)?(/[^\\?#]*)(\\?([^#]*))?(#(.*))?"};
         std::smatch match;
-        if (!std::regex_match(uri, match, uriRegex))
-            throw std::runtime_error("error while parsing URI");
-
-        uriBase = match.str(2);
-        if (uriBase.back() == '/')
-            uriBase.pop_back();
-        query = match.str(4);
-        part = match.str(6);
+        if (std::regex_match(uri, match, uriRegex))
+        {
+            uriBase = match.str(2);
+            if (uriBase.back() == '/')
+                uriBase.pop_back();
+            query = match.str(4);
+            part = match.str(6);
+        }
+        else
+            malformed = true;
     }
 
     inline static const std::unordered_map<std::string, Method> toMethod = {
@@ -68,18 +89,38 @@ private:
         {"HEAD", head},
         {"POST", post},
         {"PUT", put},
-        {"DELETE", delet}};
+        {"DELETE", delet},
+        {"OPTIONS", options},
+        {"TRACE", trace}
+    };
+    inline static const std::unordered_map<Method, std::string> methodToString {
+        {get, "GET"},
+        {head, "HEAD"},
+        {put, "PUT"},
+        {post, "POST"},
+        {delet, "DELET"}
+    };
 
-    inline static std::string noContentTypeString = "UNKNOWN_CONTENT_TYPE";
-
-    void setRequestLine(const std::string& line)
+    void parseRequestLine(const std::string& line)
     {
         static const std::regex startLineRegex{"([^ ]+) ([^ ]+) ([^ ]+)"};
         std::smatch match;
-        std::regex_match(line, match, startLineRegex);
-        method = toMethod.at(match.str(1));
-        setUri(match.str(2));
-        httpVersion = match.str(3);
+        if (std::regex_match(line, match, startLineRegex))
+        {
+            try {
+                method = toMethod.at(match.str(1));
+            } catch (std::out_of_range &e) {
+                DEBUG << "malformed request - bad method";
+                malformed = true;
+            }
+            setUri(match.str(2));
+            httpVersion = match.str(3);
+        }
+        else
+        {
+            DEBUG << "malformed request - first line regex does not match";
+            malformed = true;
+        }
     }
 
     static Coroutine<HttpRequest> fetchRequest(TcpClient &tcpClient, std::string &buffer)
@@ -96,12 +137,19 @@ private:
         DEBUG << "header fetched";
         std::string header = buffer.substr(0, headerEnd + crlf.size());
         buffer = buffer.substr(headerEnd + crlf2.size());
+        DEBUG << header;
 
         HttpRequest request;
 
         std::vector<std::string> headerLines = split(header);
 
-        request.setRequestLine(headerLines[0]);
+        request.parseRequestLine(headerLines[0]);
+        if (request.malformed)
+            co_return request;
+
+        // save header in unparsed form only for TRACE requests
+        if (request.getMethod() == trace)
+            request.unparsedHeader = header;
 
         std::string lastHeader;
         for (int i = 1; i < (int)headerLines.size(); i++)
@@ -111,9 +159,18 @@ private:
                 request.rawHeaders[lastHeader] += line;
             else
             {
-                int splitIndex = line.find(':');
-                lastHeader = line.substr(0, splitIndex);
-                request.rawHeaders[lastHeader] += line.substr(splitIndex + 1);
+                size_t splitIndex = line.find(':');
+                if (splitIndex != std::string::npos)
+                {
+                    lastHeader = line.substr(0, splitIndex);
+                    request.rawHeaders[lastHeader] += line.substr(splitIndex + 1);
+                }
+                else
+                {
+                    request.malformed = true;
+                    DEBUG << "malformed request - bad header line";
+                    co_return request;
+                }
             }
         }
 

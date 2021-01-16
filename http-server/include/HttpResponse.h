@@ -126,7 +126,7 @@ public:
         setBody(jsonBody.dump(), "application/json");
         return *this;
     }
-    HttpResponse & setCookie(const std::string &name, const std::string &value, const std::string &expirationDate = "", const std::string &path = "/")
+    HttpResponse &setCookie(const std::string &name, const std::string &value, const std::string &expirationDate = "", const std::string &path = "/")
     {
         std::string cookie = name + "=" + value + "; path=" + path;
         if (!expirationDate.empty())
@@ -134,7 +134,12 @@ public:
         setHeader("Set-Cookie", cookie);
         return *this;
     }
-    HttpResponse & deleteCookie(const std::string &name, const std::string &path = "/")
+    HttpResponse &closeConnection()
+    {
+        setHeader("Connection", "close");
+        return *this;
+    }
+    HttpResponse &deleteCookie(const std::string &name, const std::string &path = "/")
     {
         setCookie(name, "deleted", "Thu, 01 Jan 1970 00:00:00 GMT", path);
         return *this;
@@ -162,7 +167,7 @@ private:
         if (!body.empty())
             rawHeaders["Content-Length"] = std::to_string(body.size());
 
-        if (request.hasHeader("Connection"))
+        if (request.hasHeader("Connection") && !hasHeader("Connection"))
             rawHeaders["Connection"] = request.getHeader("Connection");
 
         std::string message = "HTTP/1.1 " + statusToLine.at(status) + crlf;
@@ -174,8 +179,6 @@ private:
 
         if (request.getMethod() != HttpRequest::Method::head)
             message += body;
-
-        DEBUG << "Completed message:" << message;
 
         auto sendCoroutine = tcpClient.send(message);
         iterative_co_await(sendCoroutine);
