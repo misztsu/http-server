@@ -35,7 +35,7 @@ public:
     {
         return [=](auto &request, auto &response) {
             try {
-                const json &value = request.getBodyJson()[param];
+                const json &value = request.getBodyJson().at(param);
                 if (!value.is_string())
                     RequestUtils::send400Json(response, "Body element " + param.to_string() + " must be string", body, param.to_string());
                 else if (!std::regex_match(value.get<std::string>(), regex))
@@ -50,6 +50,18 @@ public:
     {
         static const std::regex emailRegex{"(\\w+)(\\.|_)?(\\w*)@(\\w+)(\\.(\\w+))+"};
         return bodyRegex(param, emailRegex, "email");
+    }
+
+    static RequestHandler::CallbackType bodyStringNonEmptyNoWhitespaces(const json::json_pointer &param)
+    {
+        static const std::regex nonEmptyNoWhitespacesRegex("^\\w+$");
+        return bodyRegex(param, nonEmptyNoWhitespacesRegex, "non empty string with no whitespaces");
+    }
+
+    static RequestHandler::CallbackType bodyStringNonEmpty(const json::json_pointer &param)
+    {
+        static const std::regex nonEmptyRegex("[^]+$");
+        return bodyRegex(param,  nonEmptyRegex, "non empty string");
     }
 
 private:
