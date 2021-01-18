@@ -18,13 +18,6 @@ json getMessageJson(const std::string &message)
     return json{{"message", message}};
 }
 
-void pathUserExistsValidator(HttpRequest &request, HttpResponse &response)
-{
-    auto userId = request.getPathParam("userId");
-    if (!userManager.hasUser(userId))
-        response.setStatus(HttpResponse::Not_Found).setJsonBody(getMessageJson("User " + userId + " not found.")).send();
-}
-
 void pathUserLoggedInValidator(HttpRequest &request, HttpResponse &response)
 {
     if (!request.hasCookie("token"))
@@ -35,20 +28,6 @@ void pathUserLoggedInValidator(HttpRequest &request, HttpResponse &response)
         User &user = userManager.getUser(userId);
         if (!user.equalToken(request.getCookie("token")))
             response.setStatus(HttpResponse::Unauthorized).setJsonBody(getMessageJson("User is not authorized to do this.")).send();
-    }
-}
-
-void pathNoteExistsValidator(HttpRequest &request, HttpResponse &response)
-{
-    auto userId = request.getPathParam("userId");
-    auto noteId = std::stoi(request.getPathParam("noteId"));
-    if (!userManager.hasUser(userId))
-        response.setStatus(HttpResponse::Not_Found).setJsonBody(getMessageJson("User " + userId + " not found.")).send();
-    else
-    {
-        auto user = userManager.getUser(userId);
-        if (!user.hasNote(noteId))
-            response.setStatus(HttpResponse::Not_Found).setJsonBody(getMessageJson("Note " + std::to_string(noteId) + " not found.")).send();
     }
 }
 
@@ -74,11 +53,6 @@ int main()
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
                     auto hash = request.getBodyJson()["/hash"_json_pointer].get<std::string>();
-                    if (userManager.hasUser(userId))
-                    {
-                        response.setStatus(HttpResponse::Conflict).setJsonBody(json{{"message", "User " + userId + " already exists."}});
-                        return;
-                    }
                     auto &user = userManager.addUser(userId, hash);
                     response.setStatus(HttpResponse::Created)
                         .setCookie("token", user.getNewToken(), user.getTokenExpirationDate())
@@ -91,11 +65,6 @@ int main()
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
                     auto hash = request.getBodyJson()["/hash"_json_pointer].get<std::string>();
-                    if (!userManager.hasUser(userId))
-                    {
-                        response.setStatus(HttpResponse::Not_Found).setJsonBody(json{{"message", "User " + userId + " not found."}});
-                        return;
-                    }
                     auto &user = userManager.getUser(userId);
                     if (!user.equalHash(hash))
                     {
@@ -103,8 +72,8 @@ int main()
                         return;
                     }
                     response.setStatus(HttpResponse::OK)
-                        .setCookie("token", user.getNewToken(), user.getTokenExpirationDate())
-                        .setJsonBody(json{{"userId", user.getUserId()}});
+                            .setCookie("token", user.getNewToken(), user.getTokenExpirationDate())
+                            .setJsonBody(json{{"userId", user.getUserId()}});
                 });
 
     server.post("/users/logout",
@@ -115,7 +84,6 @@ int main()
                 });
 
     server.get("/users/{userId}/notes",
-                pathUserExistsValidator,
                 pathUserLoggedInValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
@@ -130,7 +98,6 @@ int main()
                 });
 
     server.get("/users/{userId}/notes/add",
-                pathUserExistsValidator,
                 pathUserLoggedInValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
@@ -140,7 +107,6 @@ int main()
                 });
 
     server.get("/users/{userId}/notes/loadExamples",
-                pathUserExistsValidator,
                 pathUserLoggedInValidator,
                 [&](auto &request, auto &response) {
                     auto userId = request.getPathParam("userId");
@@ -151,7 +117,6 @@ int main()
 
     server.get("/users/{userId}/notes/{noteId}",
                 Validators::pathParamInt("noteId"),
-                pathNoteExistsValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
                     auto noteId = std::stoi(request.getPathParam("noteId"));
@@ -163,7 +128,6 @@ int main()
 
     server.get("/users/{userId}/notes/{noteId}/delete",
                 Validators::pathParamInt("noteId"),
-                pathNoteExistsValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
                     auto noteId = std::stoi(request.getPathParam("noteId"));
@@ -175,7 +139,6 @@ int main()
     server.post("/users/{userId}/notes/{noteId}/update",
                 Validators::pathParamInt("noteId"),
                 Validators::bodyStringNonEmpty("/content"_json_pointer),
-                pathNoteExistsValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
                     auto noteId = std::stoi(request.getPathParam("noteId"));
@@ -187,6 +150,27 @@ int main()
                 });
 
     server.bindStaticDirectory("/", frontEndStatic);
+
+    server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
+        try {
+            auto ue = dynamic_cast<const UserManager::UserExists &>(e);
+            response.setStatus(HttpResponse::Conflict).setJsonBody(getMessageJson(ue.what())).send();
+        } catch (const std::bad_cast &ignored) {}
+    });
+
+    server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
+        try {
+            auto unf = dynamic_cast<const UserManager::UserNotFound &>(e);
+            response.setStatus(404).setJsonBody(getMessageJson(unf.what())).send();
+        } catch (const std::bad_cast &ignored) {}
+    });
+
+    server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
+        try {
+            auto nnf = dynamic_cast<const User::NoteNotFound &>(e);
+            response.setStatus(404).setJsonBody(getMessageJson(nnf.what())).send();
+        } catch (const std::bad_cast &ignored) {}
+    });
 
     // for testing frontend on development server
     // server.addAccessControllAllowOrigin("*");

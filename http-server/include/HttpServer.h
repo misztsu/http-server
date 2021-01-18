@@ -97,6 +97,13 @@ public:
         });
     }
 
+    using ExceptionHandler = std::function<void(const std::exception&, HttpResponse&)>;
+
+    void addExceptionHandler(ExceptionHandler &&callback)
+    {
+        exceptionHandlers.emplace_back(std::move(callback));
+    }
+
     [[noreturn]]
     void listen(int port = 80)
     {
@@ -129,6 +136,8 @@ private:
         {HttpRequest::Method::post, {}},
         {HttpRequest::Method::delet, {}}
     };
+
+    std::vector<ExceptionHandler> exceptionHandlers;
 
     void sendFile(HttpRequest &request, HttpResponse &response, std::filesystem::path path)
     {
@@ -202,8 +211,17 @@ private:
 
                     auto responsePromise = std::async(std::launch::async, [&](Notify notify) {
                         try {
-                            DEBUG << "launching callback for " << request.getUriBase();
-                            callback(request, response);
+                            try {
+                                DEBUG << "launching callback for " << request.getUriBase();
+                                callback(request, response);
+                            } catch (const std::exception &e) {
+                                for (auto &exceptionHandler : exceptionHandlers)
+                                {
+                                    if (response.isReady())
+                                        break;
+                                    exceptionHandler(e, response);
+                                }
+                            }
                         } catch (const std::exception &e) {
                             fatal500(request, response);
                             DEBUG << "what():" << e.what();
@@ -223,7 +241,7 @@ private:
             }
         } catch (TcpClient::ConnectionClosedException &ignored)
         {
-            DEBUG << "Client closed connection despite no \"Connection: closed\"";
+            DEBUG << R"*(Client closed connection despite no "Connection: closed")*";
         }
 
         notify.release();

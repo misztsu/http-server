@@ -20,7 +20,11 @@ public:
 
     Note &getNote(int noteId)
     {
-        return notes.at(noteId);
+        try {
+            return notes.at(noteId);
+        } catch (const std::out_of_range &e) {
+            throw NoteNotFound(userId, noteId);
+        }
     }
 
     Note &addNote()
@@ -38,7 +42,7 @@ public:
             notes.erase(it);
         }
         else
-            throw std::out_of_range("Note \"" + std::to_string(noteId) + "\" not found");
+            throw NoteNotFound(userId, noteId);
     }
 
     void deleteAllNotes()
@@ -87,6 +91,19 @@ public:
         utcString << std::put_time(std::localtime(&end_time_t), "%a, %d %b %Y %H:%M:%S GMT");
         return utcString.str();
     }
+    class NoteNotFound : public std::out_of_range
+    {
+    public:
+        NoteNotFound(const std::string &userId, int noteId) :
+                std::out_of_range("Note " + userId + "/" + std::to_string(noteId) + " not found"),
+                userId(userId),
+                noteId(noteId) {}
+        const std::string &getUserId() const { return userId; }
+        int getNoteId() const { return noteId; }
+    private:
+        const std::string userId;
+        const int noteId;
+    };
 
 private:
     User(const std::string &userId_) : userId(userId_)
@@ -139,20 +156,44 @@ public:
 
     User &addUser(const std::string &userId, const std::string &hash)
     {
-        User &user = users.insert({userId, User(userId, hash)}).first->second;
+        if (hasUser(userId))
+            throw UserExists(userId);
+        User &user = users.emplace(userId, User(userId, hash)).first->second;
         user.loadExampleNotes();
         return user;
     }
 
     User &getUser(std::string userId)
     {
-        return users.at(userId);
+        try {
+            return users.at(userId);
+        } catch (const std::out_of_range &e) {
+            throw UserNotFound(userId);
+        }
     }
 
     bool hasUser(std::string userId) const
     {
         return users.find(userId) != users.end();
     }
+
+    class UserExists : public std::out_of_range
+    {
+    public:
+        UserExists(const std::string &userId) : std::out_of_range("User " + userId + " already exists"), userId(userId) {}
+        const std::string &getUserId() const { return userId; }
+    private:
+        const std::string userId;
+    };
+
+    class UserNotFound : public std::out_of_range
+    {
+    public:
+        UserNotFound(const std::string &userId) : std::out_of_range("User " + userId + " not found"), userId(userId) {}
+        const std::string &getUserId() const { return userId; }
+    private:
+        const std::string userId;
+    };
 
 private:
     void loadUsers()
