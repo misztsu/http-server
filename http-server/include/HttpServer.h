@@ -221,10 +221,11 @@ private:
                                         break;
                                     exceptionHandler(e, response);
                                 }
+                                if (!response.isReady())
+                                    throw;
                             }
                         } catch (const std::exception &e) {
-                            fatal500(request, response);
-                            DEBUG << "what():" << e.what();
+                            defaultExceptionHandler(e, request, response);
                         } catch (...) {
                             fatal500(request, response);
                             DEBUG << "NOT EVEN DERIVED FROM std::exception";
@@ -256,6 +257,17 @@ private:
         response.setBody("<h1>404</h1> Resource not found <br/> :(");
     }
     RequestHandler::CallbackType defaultCallback = default404;
+
+    static void defaultExceptionHandler(const std::exception &e, HttpRequest &request, HttpResponse &response)
+    {
+        try {
+            auto ce = dynamic_cast<const HttpRequest::JsonParseError &>(e);
+            RequestUtils::send400Json(response, std::string("malformed json as body: ") + ce.what(), "body");
+            return;
+        } catch (const std::bad_cast &ignored) {}
+        fatal500(request, response);
+        DEBUG << e.what();
+    }
 
     static void fatal500(HttpRequest &request, HttpResponse &response)
     {

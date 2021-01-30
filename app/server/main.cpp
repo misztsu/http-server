@@ -39,10 +39,10 @@ int main()
     });
 
     for (auto &path : {
-             "/",
-             "/login",
-             "/users/{userId}",
-             "/shared/{userId}/{noteId}"})
+            "/",
+            "/login",
+            "/users/{userId}",
+            "/shared/{userId}/{noteId}"})
     {
         server.bindStaticFile(path, indexHtml);
     }
@@ -91,9 +91,9 @@ int main()
                     json body = json::array();
                     for (const auto &note : user.getNotes())
                         body.push_back(json{
-                            {"userId", note.second.getUserId()},
-                            {"noteId", note.second.getNoteId()},
-                            {"content", note.second.getContent()}});
+                            {"userId", note.second->getUserId()},
+                            {"noteId", note.second->getNoteId()},
+                            {"content", note.second->getContent()}});
                     response.setStatus(HttpResponse::OK).setJsonBody(body);
                 });
 
@@ -102,8 +102,8 @@ int main()
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
                     User &user = userManager.getUser(userId);
-                    Note &note = user.addNote();
-                    response.setStatus(HttpResponse::Created).setJsonBody(json{{"noteId", note.getNoteId()}, {"userId", user.getUserId()}});
+                    auto note = user.addNote();
+                    response.setStatus(HttpResponse::Created).setJsonBody(json{{"noteId", note->getNoteId()}, {"userId", user.getUserId()}});
                 });
 
     server.get("/users/{userId}/notes/loadExamples",
@@ -121,32 +121,34 @@ int main()
                     auto userId = request.getPathParam("userId");
                     auto noteId = std::stoi(request.getPathParam("noteId"));
                     User &user = userManager.getUser(userId);
-                    Note &note = user.getNote(noteId);
+                    auto note = user.getNote(noteId);
                     response.setStatus(HttpResponse::OK)
-                        .setJsonBody(json{{"userId", note.getUserId()}, {"noteId", note.getNoteId()}, {"content", note.getContent()}});
+                        .setJsonBody(json{{"userId", note->getUserId()}, {"noteId", note->getNoteId()}, {"content", note->getContent()}});
                 });
 
-    server.get("/users/{userId}/notes/{noteId}/delete",
+    server.delet("/users/{userId}/notes/{noteId}",
                 Validators::pathParamInt("noteId"),
+                Validators::bodyString("/old"_json_pointer),
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
                     auto noteId = std::stoi(request.getPathParam("noteId"));
                     User &user = userManager.getUser(userId);
-                    user.deleteNote(noteId);
+                    user.deleteNote(noteId, request.getBodyJson()["/old"_json_pointer]);
                     response.setStatus(HttpResponse::OK).setJsonBody(json{{"noteId", noteId}});
                 });
 
-    server.post("/users/{userId}/notes/{noteId}/update",
+    server.post("/users/{userId}/notes/{noteId}",
                 Validators::pathParamInt("noteId"),
                 Validators::bodyStringNonEmpty("/content"_json_pointer),
+                Validators::bodyString("/old"_json_pointer),
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
                     auto noteId = std::stoi(request.getPathParam("noteId"));
                     User &user = userManager.getUser(userId);
-                    Note &note = user.getNote(noteId);
+                    auto note = user.getNote(noteId);
                     std::string content = request.getBodyJson()["/content"_json_pointer].get<std::string>();
-                    note.setContent(content);
-                    response.setStatus(HttpResponse::OK).setJsonBody(json{{"noteId", note.getNoteId()}});
+                    note->setContent(content, request.getBodyJson()["/old"_json_pointer]);
+                    response.setStatus(HttpResponse::OK).setJsonBody(json{{"noteId", note->getNoteId()}});
                 });
 
     server.bindStaticDirectory("/", frontEndStatic);
@@ -167,8 +169,17 @@ int main()
 
     server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
         try {
-            auto nnf = dynamic_cast<const User::NoteNotFound &>(e);
+            auto nnf = dynamic_cast<const Note::NoteNotFound &>(e);
             response.setStatus(404).setJsonBody(getMessageJson(nnf.what())).send();
+        } catch (const std::bad_cast &ignored) {}
+    });
+
+    server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
+        try {
+            auto ov = dynamic_cast<const Note::OldVersion &>(e);
+            response.setStatus(HttpResponse::Conflict).setJsonBody({
+                    {"message", ov.what()},
+                    {"content", ov.getContent()}}).send();
         } catch (const std::bad_cast &ignored) {}
     });
 

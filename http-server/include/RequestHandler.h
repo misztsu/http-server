@@ -51,13 +51,7 @@ private:
     static void defaultChecks(HttpRequest &request, HttpResponse &response)
     {
         if (request.getContentType() == "application/json")
-        {
-            try {
-                static_cast<void>(request.getBodyJson());
-            } catch (json::parse_error &e) {
-                RequestUtils::send400Json(response, "malformed JSON", "body");
-            }
-        }
+            static_cast<void>(request.getBodyJson());
     }
 
     friend class HttpServer;

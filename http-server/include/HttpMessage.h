@@ -23,12 +23,6 @@ public:
     }
 
     const std::string &getBody() { return body; }
-    const json &getBodyJson()
-    {
-        if (!jsonBody)
-            jsonBody = {json::parse(body)};
-        return jsonBody.value();
-    }
 
 protected:
 

@@ -46,6 +46,23 @@ public:
         };
     }
 
+    static RequestHandler::CallbackType bodyType(const json::json_pointer &param, json::value_t type, std::string name = "specific type")
+    {
+        return [=](auto &request, auto &response) {
+            try {
+                if (request.getBodyJson().at(param).type() != type)
+                    RequestUtils::send400Json(response, "Body element " + param.to_string() + " must be " + name, body, param.to_string());
+            } catch (const json::out_of_range &e) {
+                RequestUtils::send400Json(response, "Body element " + param.to_string() + " is required", body, param.to_string());
+            }
+        };
+    }
+
+    static RequestHandler::CallbackType bodyString(const json::json_pointer &param)
+    {
+        return bodyType(param, json::value_t::string, "string");
+    }
+
     static RequestHandler::CallbackType bodyEmail(const json::json_pointer &param)
     {
         static const std::regex emailRegex{"(\\w+)(\\.|_)?(\\w*)@(\\w+)(\\.(\\w+))+"};

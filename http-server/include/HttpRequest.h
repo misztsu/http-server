@@ -40,6 +40,24 @@ public:
     using HttpMessage::getHeader;
     using HttpMessage::hasHeader;
 
+    class JsonParseError : public std::invalid_argument
+    {
+    public:
+        JsonParseError(const json::parse_error &e) : invalid_argument(e.what()) {}
+    };
+    const json &getBodyJson()
+    {
+        if (!jsonBody)
+        {
+            try {
+                jsonBody = {json::parse(body)};
+            } catch (const json::parse_error &e) {
+                throw JsonParseError(e);
+            }
+        }
+        return jsonBody.value();
+    }
+
     inline static const std::string noContentTypeString = "UNKNOWN_CONTENT_TYPE";
 
 private:

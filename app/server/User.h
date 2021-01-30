@@ -2,61 +2,57 @@
 #define USER_H
 
 #include <unordered_map>
+#include <mutex>
 #include <string>
+
 #include "Note.h"
+#include "utils/SharedMap.h"
 
 class User
 {
 public:
-    const std::unordered_map<int, Note> &getNotes() const
+    using NotePtr = std::shared_ptr<Note>;
+
+    const SharedMap<int, NotePtr> &getNotes() const
     {
         return notes;
     }
 
     bool hasNote(int noteId)
     {
-        return notes.find(noteId) != notes.end();
+        return notes.hasKey(noteId);
     }
 
-    Note &getNote(int noteId)
+    NotePtr getNote(int noteId)
     {
         try {
             return notes.at(noteId);
         } catch (const std::out_of_range &e) {
-            throw NoteNotFound(userId, noteId);
+            throw Note::NoteNotFound(userId, noteId);
         }
     }
 
-    Note &addNote()
+    NotePtr addNote()
     {
         maxNoteId++;
-        return notes.insert({maxNoteId, Note(userId, maxNoteId)}).first->second;
+        return notes.emplace(maxNoteId, new Note(userId, maxNoteId)).first->second;
     }
 
-    void deleteNote(int noteId)
+    void deleteNote(int noteId, std::string oldContent)
     {
-        auto it = notes.find(noteId);
-        if (it != notes.end())
-        {
-            it->second.remove();
-            notes.erase(it);
+        try {
+            notes.at(noteId)->remove(oldContent);
+            notes.erase(noteId);
+        } catch (const std::out_of_range &e) {
+            throw Note::NoteNotFound(userId, noteId);
         }
-        else
-            throw NoteNotFound(userId, noteId);
-    }
-
-    void deleteAllNotes()
-    {
-        notes.clear();
-        maxNoteId = 0;
     }
 
     void loadExampleNotes()
     {
-        deleteAllNotes();
-        addNote().setContent("Zagadka (C++):\n\n```\nint main() {\n    (+[]{})();\n}\n```\n\nDlaczego ten kod się kompiluje?");
-        addNote().setContent("Do zrobienia:\n\n- [x] Sieci komputerowe\n- [ ] Systemy zarządzania bazami danych");
-        addNote().setContent("> Litwo! Ojczyzno moja! ty jesteś jak zdrowie.\n> Ile cię trzeba cenić, ten tylko się dowie,\n> Kto cię stracił. Dziś piękność twą w całej ozdobie\n> Widzę i opisuję, bo tęsknię po tobie.\n*Pan Tadeusz* Adam Mickiewicz");
+        addNote()->setContent("Zagadka (C++):\n\n```\nint main() {\n    (+[]{})();\n}\n```\n\nDlaczego ten kod się kompiluje?", "");
+        addNote()->setContent("Do zrobienia:\n\n- [x] Sieci komputerowe\n- [x] Systemy zarządzania bazami danych", "");
+        addNote()->setContent("> Litwo! Ojczyzno moja! ty jesteś jak zdrowie.\n> Ile cię trzeba cenić, ten tylko się dowie,\n> Kto cię stracił. Dziś piękność twą w całej ozdobie\n> Widzę i opisuję, bo tęsknię po tobie.\n*Pan Tadeusz* Adam Mickiewicz", "");
     }
 
     const std::string &getUserId() const
@@ -91,19 +87,6 @@ public:
         utcString << std::put_time(std::localtime(&end_time_t), "%a, %d %b %Y %H:%M:%S GMT");
         return utcString.str();
     }
-    class NoteNotFound : public std::out_of_range
-    {
-    public:
-        NoteNotFound(const std::string &userId, int noteId) :
-                std::out_of_range("Note " + userId + "/" + std::to_string(noteId) + " not found"),
-                userId(userId),
-                noteId(noteId) {}
-        const std::string &getUserId() const { return userId; }
-        int getNoteId() const { return noteId; }
-    private:
-        const std::string userId;
-        const int noteId;
-    };
 
 private:
     User(const std::string &userId_) : userId(userId_)
@@ -121,7 +104,7 @@ private:
             {
                 int id = std::stoi(p.path().stem().string());
                 maxNoteId = id > maxNoteId ? id : maxNoteId;
-                notes.insert({id, Note(userId, id)});
+                notes.emplace(id, new Note(userId, id));
             }
         }
     }
@@ -134,7 +117,7 @@ private:
     }
 
     int maxNoteId = 0;
-    std::unordered_map<int, Note> notes;
+    SharedMap<int, NotePtr> notes;
     const std::string userId;
     std::string hash;
 
@@ -158,6 +141,7 @@ public:
     {
         if (hasUser(userId))
             throw UserExists(userId);
+
         User &user = users.emplace(userId, User(userId, hash)).first->second;
         user.loadExampleNotes();
         return user;
@@ -174,7 +158,7 @@ public:
 
     bool hasUser(std::string userId) const
     {
-        return users.find(userId) != users.end();
+        return users.hasKey(userId);
     }
 
     class UserExists : public std::out_of_range
@@ -202,11 +186,11 @@ private:
         for (auto &p : std::filesystem::directory_iterator("users"))
         {
             auto userId = p.path().filename().string();
-            users.insert({userId, User(userId)});
+            users.emplace(userId, User(userId));
         }
     }
 
-    std::unordered_map<std::string, User> users;
+    SharedMap<std::string, User> users;
 };
 
 #endif /* USER_H */
