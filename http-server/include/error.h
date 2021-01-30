@@ -8,6 +8,7 @@
 static constexpr int errorCode = -1;
 
 template <class T>
+[[ noreturn ]]
 static void error(T &&message)
 {
     Debug() << message << errno << std::strerror(errno);

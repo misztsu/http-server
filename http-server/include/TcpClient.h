@@ -62,7 +62,7 @@ public:
         {
             do
             {
-                code = length = ::send(socket, buff.c_str() + length, buff.size() - length, MSG_DONTWAIT);
+                code = length = ::send(socket, buff.c_str() + length, buff.size() - length, MSG_DONTWAIT | MSG_NOSIGNAL);
                 DEBUG << "send on socket" << socket << "returned" << code << "errno is" << errno;
                 if (tryAgain(code))
                     co_await std::suspend_always();
@@ -71,7 +71,12 @@ public:
             } while (true);
 
             if (code == errorCode)
-                error("send");
+            {
+                if (errno == ECONNRESET || errno == EPIPE)
+                    throw ConnectionClosedException();
+                else
+                    error("send");
+            }
 
             DEBUG << length << "bytes sent";
         }
@@ -82,7 +87,7 @@ public:
     Coroutine<std::string> receive()
     {
         size_t length = 0;
-        std::string buff(8192, 0); // TODO: this size should balance itself over time
+        std::string buff(8192, 0);
         DEBUG << "receiving on socket" << socket;
         do
         {
@@ -100,7 +105,12 @@ public:
             buff.resize(length);
         }
         else
-            error("recv");
+        {
+            if (errno == ECONNREFUSED)
+                throw ConnectionClosedException();
+            else
+                error("recv");
+        }
 
         if (buff.empty())
             throw ConnectionClosedException();

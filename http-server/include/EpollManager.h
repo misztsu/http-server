@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <sys/eventfd.h>
 
+#include "error.h"
 #include "Network.h"
 #include "Coroutine.h"
 
