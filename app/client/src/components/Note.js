@@ -1,19 +1,18 @@
-import { Link } from '@material-ui/core';
-import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
 import ButtonBase from '@material-ui/core/ButtonBase';
 import Card from '@material-ui/core/Card';
 import CardActions from '@material-ui/core/CardActions';
 import CardContent from '@material-ui/core/CardContent';
-import Checkbox from '@material-ui/core/Checkbox';
+import CircularProgress from '@material-ui/core/CircularProgress';
 import Collapse from '@material-ui/core/Collapse';
 import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
 import DialogContent from '@material-ui/core/DialogContent';
 import DialogContentText from '@material-ui/core/DialogContentText';
 import DialogTitle from '@material-ui/core/DialogTitle';
-import Divider from '@material-ui/core/Divider';
+import Grid from '@material-ui/core/Grid';
 import IconButton from '@material-ui/core/IconButton';
+import Paper from '@material-ui/core/Paper';
 import { withStyles } from '@material-ui/core/styles';
 import TextField from '@material-ui/core/TextField';
 import Typography from '@material-ui/core/Typography';
@@ -23,45 +22,14 @@ import EditIcon from '@material-ui/icons/Edit';
 import SaveIcon from '@material-ui/icons/Save';
 import ShareIcon from '@material-ui/icons/Share';
 import MDEditor from '@uiw/react-md-editor';
+import { withSnackbar } from 'notistack';
 import React from 'react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import ReactMarkdown from 'react-markdown';
-import gfm from 'remark-gfm';
+import Markdown from './Markdown';
 
 const useStyles = (theme) => ({
-    content: {
-        paddingTop: theme.spacing(1),
-        paddingBottom: theme.spacing(1)
-    },
     buttonBase: {
         display: 'block'
-    },
-    blockquote: {
-        paddingLeft: theme.spacing(1),
-        paddingRight: '4px',
-        borderLeftWidth: '4px',
-        borderLeftStyle: 'solid',
-        borderLeftColor: theme.palette.primary.main,
-        backgroundColor: 'rgba(0, 0, 0, 0.16)',
-        borderTopRightRadius: '4px',
-        borderBottomRightRadius: '4px',
-        whiteSpace: 'pre',
-        display: 'block'
-    },
-    code: {
-        paddingLeft: '4px',
-        paddingRight: '4px',
-        backgroundColor: 'rgba(0, 0, 0, 0.16)',
-        borderRadius: '4px',
-        whiteSpace: 'pre',
-        display: 'block'
-    },
-    li: {
-        marginLeft: '-18px',
-        listStyleType: 'none'
-    },
-    checkbox: {
-        padding: '0 4px 4px 0'
     },
     editor: {
         '--background-paper': theme.palette.background.paper,
@@ -69,6 +37,19 @@ const useStyles = (theme) => ({
         '--font-size': theme.typography.body1.fontSize,
         '--color': theme.palette.text.primary,
         '--primary-color': theme.palette.primary.dark,
+    },
+    fabProgress: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        zIndex: 1,
+    },
+    wrapper: {
+        margin: theme.spacing(0),
+        position: 'relative',
+    },
+    paper: {
+        padding: theme.spacing(2)
     }
 })
 
@@ -79,115 +60,148 @@ class Note extends React.Component {
         this.state = {
             expanded: props.expanded,
             content: props.content,
+            oldContent: props.content,
+            webContent: '',
             key: 0,
-            copySharedNoteUrl: false
+            shareDialog: false,
+            sharedDialog: false,
+            updateDialog: false,
+            deleteDialog: false,
+            updating: false,
+            deleting: false
         }
 
         this.expand = this.expand.bind(this)
+        this.update = this.update.bind(this)
         this.delete = this.delete.bind(this)
-
     }
 
     componentDidUpdate(prevProps) {
-        if (this.props.content !== prevProps.content)
-            this.setState({ content: this.props.content, key: this.state.key + 1 })
+        if (this.props.content !== prevProps.content) {
+            this.setState({ content: this.props.content, oldContent: this.props.content, key: this.state.key + 1 })
+        }
     }
 
     async expand() {
         if (this.state.expanded) {
-            try {
-                const response = await fetch(`/users/${this.props.userId}/notes/${this.props.noteId}/update`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        content: this.state.content
-                    })
-                })
-                const body = await response.json()
-                if (response.status == 200) {
-                    this.props.onRefresh({
-                        action: 'update',
-                        noteId: this.props.noteId,
-                        content: this.state.content
-                    })
-                } else {
-                    console.warn(body)
-                    this.props.enqueueSnackbar(body.message, { variant: 'error' })
-                }
-            } catch (error) {
-                console.error(error)
-                this.props.enqueueSnackbar('Error.', { variant: 'error' })
-            }
+            await this.update()
         }
         this.setState({ expanded: !this.state.expanded })
     }
 
-    async delete() {
+    async update() {
+        this.setState({ updating: true })
         try {
-            const response = await fetch(`/users/${this.props.userId}/notes/${this.props.noteId}/delete`, {
-                method: 'GET'
+            const response = await fetch(`/users/${this.props.userId}/notes/${this.props.noteId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    content: this.state.content,
+                    old: this.state.oldContent
+                })
             })
             const body = await response.json()
             if (response.status == 200) {
                 this.props.onRefresh({
-                    action: 'delete',
-                    noteId: this.props.noteId
+                    action: this.props.shared ? 'updateShared' : 'update',
+                    noteId: this.props.noteId,
+                    userId: this.props.userId,
+                    content: this.state.content
                 })
+                this.setState({ updating: false })
+            } else if (response.status == 409) {
+                console.warn(body)
+                this.setState({
+                    webContent: body.content,
+                    updateDialog: true
+                })
+            } else if (response.status == 404) {
+                this.props.enqueueSnackbar('Note was deleted.', { variant: 'error' })
+                this.setState({ updating: false })
             } else {
                 console.warn(body)
                 this.props.enqueueSnackbar(body.message, { variant: 'error' })
+                this.setState({ updating: false })
             }
         } catch (error) {
             console.error(error)
             this.props.enqueueSnackbar('Error.', { variant: 'error' })
+            this.setState({ updating: false })
+        }
+    }
+
+    async delete() {
+        this.setState({ deleting: true })
+        try {
+            const response = await fetch(`/users/${this.props.userId}/notes/${this.props.noteId}`, {
+                method: 'DELETE',
+                body: JSON.stringify({
+                    old: this.state.oldContent
+                })
+            })
+            const body = await response.json()
+            if (response.status == 200) {
+                this.props.onRefresh({
+                    action: this.props.shared ? 'deleteShared' : 'delete',
+                    noteId: this.props.noteId,
+                    userId: this.props.userId
+                })
+                this.setState({ deleting: false })
+            } else if (response.status == 409) {
+                this.setState({
+                    webContent: body.content,
+                    deleteDialog: true
+                })
+            } else if (response.status == 404) {
+                this.props.enqueueSnackbar('Note was deleted.', { variant: 'error' })
+                this.setState({ deleting: false })
+            } else {
+                console.warn(body)
+                this.props.enqueueSnackbar(body.message, { variant: 'error' })
+                this.setState({ deleting: false })
+            }
+        } catch (error) {
+            console.error(error)
+            this.props.enqueueSnackbar('Error.', { variant: 'error' })
+            this.setState({ deleting: false })
         }
     }
 
     render() {
         const { classes } = this.props
-
         return (
             <Card>
                 <ButtonBase component="div" className={classes.buttonBase}>
                     <CardContent className={classes.content}>
                         <Typography component="div" variant="body1">
-                            <ReactMarkdown
-                                plugins={[[gfm, { singleTilde: false }]]}
-                                source={this.state.content}
-                                renderers={{
-                                    link: Link,
-                                    div: props => <div>{props.children}</div>,
-                                    strong: props => <Box fontWeight="fontWeightBold" component="span">{props.children}</Box>,
-                                    emphasis: props => <Box fontStyle="italic" component="span">{props.children}</Box>,
-                                    inlineCode: props => <Box className={classes.code} fontFamily="Monospace" component="span">{props.children}</Box>,
-                                    code: props => <Box className={classes.code} fontFamily="Monospace" component="span">{props.value}</Box>,
-                                    blockquote: props => <Box className={classes.blockquote} component="span">{props.children}</Box>,
-                                    listItem: props => props.checked === null ? <li>{props.children}</li> : <li className={classes.li}><Checkbox color="primary" size="small" className={classes.checkbox} checked={Boolean(props.checked)} />{props.children}</li>,
-                                    thematicBreak: Divider
-                                }}
-                                escapeHtml={false}
-                            />
+                            <Markdown content={this.state.content} />
                         </Typography>
                     </CardContent>
                 </ButtonBase>
                 <CardActions disableSpacing>
 
-                    <IconButton onClick={this.delete}>
-                        <DeleteIcon />
-                    </IconButton>
+                    <div className={classes.wrapper}>
+                        <IconButton onClick={this.delete}>
+                            <DeleteIcon />
+                        </IconButton>
+                        {!this.state.deleting ? null : <CircularProgress size={48} className={classes.fabProgress} />}
+                    </div>
 
-                    <IconButton onClick={() => this.setState({ copySharedNoteUrl: true })}>
+                    <IconButton onClick={() => this.setState({ shareDialog: true })}>
                         <ShareIcon />
                     </IconButton>
 
-                    <IconButton onClick={this.expand}>
-                        {this.state.expanded ? <SaveIcon /> : <EditIcon />}
-                    </IconButton>
+                    <div className={classes.wrapper}>
+                        <IconButton onClick={this.expand}>
+                            {this.state.expanded ? <SaveIcon /> : <EditIcon />}
+                        </IconButton>
+                        {!this.state.updating ? null : <CircularProgress size={48} className={classes.fabProgress} />}
+                    </div>
 
                     {!this.props.shared ? null :
-                        <IconButton fontSize="small" color="primary" onClick={() => this.setState({ copySharedNoteUrl: true })}>
+                        <IconButton fontSize="small" color="primary" onClick={() => this.setState({ sharedDialog: true })}>
                             <CloudIcon fontSize="small" />
                         </IconButton>
                     }
@@ -204,8 +218,10 @@ class Note extends React.Component {
                     />
                 </Collapse>
 
-                <Dialog onClose={() => this.setState({ copySharedNoteUrl: false })} open={this.state.copySharedNoteUrl}>
-                    <DialogTitle>Share with others</DialogTitle>
+                <Dialog onClose={() => this.setState({ shareDialog: false })} open={this.state.shareDialog || this.state.sharedDialog}>
+                    <DialogTitle>
+                        {this.state.shareDialog ? 'Share with others' : 'Shared note'}
+                    </DialogTitle>
                     <DialogContent>
                         <DialogContentText>
                             Anyone with this link can view, edit and delete this note. Be careful!
@@ -221,11 +237,112 @@ class Note extends React.Component {
                         />
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => this.setState({ copySharedNoteUrl: false })}>Cancel</Button>
+                        <Button onClick={() => this.setState({ shareDialog: false, sharedDialog: false })}>Cancel</Button>
                         <CopyToClipboard text={`${window.location.origin}/shared/${this.props.userId}/${this.props.noteId}`}
-                            onCopy={() => this.setState({ copySharedNoteUrl: false })}>
+                            onCopy={() => this.setState({ shareDialog: false, sharedDialog: false })}>
                             <Button color="primary">Copy</Button>
                         </CopyToClipboard>
+                    </DialogActions>
+                </Dialog>
+
+                <Dialog onClose={() => this.setState({ updateDialog: false })} open={this.state.updateDialog}>
+                    <DialogTitle>
+                        Someone edited this note
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Oops! Someone edited this note.
+                        </DialogContentText>
+                        <Grid container spacing={1} justify="space-around">
+                            <Grid item xs>
+                                <Paper variant="outlined" className={classes.paper}>
+                                    <Typography variant="button" component="div">Your version</Typography>
+                                    <Markdown content={this.state.content} />
+                                </Paper>
+                            </Grid>
+                            <Grid item xs>
+                                <Paper variant="outlined" className={classes.paper}>
+                                    <Typography variant="button" component="div">Web version</Typography>
+                                    <Markdown content={this.state.webContent} />
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button color="primary" onClick={() => {
+                            this.setState({
+                                updateDialog: false,
+                                oldContent: this.state.webContent,
+                                webContent: ''
+                            }, () => {
+                                this.update()
+                            })
+                        }}>
+                            Keep your version
+                        </Button>
+                        <Button color="primary" onClick={() => {
+                            this.setState({
+                                updateDialog: false,
+                                oldContent: this.state.webContent,
+                                content: this.state.webContent,
+                                key: this.state.key + 1,
+                                webContent: '',
+                            }, () => {
+                                this.update()
+                            })
+                        }}>
+                            Discard your version
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                <Dialog onClose={() => this.setState({ deleteDialog: false })} open={this.state.deleteDialog}>
+                    <DialogTitle>
+                        Someone edited this note
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Oops! Someone edited this note.
+                        </DialogContentText>
+                        <Grid container spacing={1} justify="space-around">
+                            <Grid item xs>
+                                <Paper variant="outlined" className={classes.paper}>
+                                    <Typography variant="button" component="div">Your version</Typography>
+                                    <Markdown content={this.state.content} />
+                                </Paper>
+                            </Grid>
+                            <Grid item xs>
+                                <Paper variant="outlined" className={classes.paper}>
+                                    <Typography variant="button" component="div">Web version</Typography>
+                                    <Markdown content={this.state.webContent} />
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button color="primary" onClick={() => {
+                            this.setState({
+                                deleteDialog: false,
+                                oldContent: this.state.webContent,
+                                webContent: ''
+                            }, () => {
+                                this.delete()
+                            })
+                        }}>
+                            Delete anyway
+                        </Button>
+                        <Button color="primary" onClick={() => {
+                            this.setState({
+                                deleteDialog: false,
+                                oldContent: this.state.webContent,
+                                content: this.state.webContent,
+                                key: this.state.key + 1,
+                                webContent: '',
+                                deleting: false
+                            })
+                        }}>
+                            Don't delete
+                        </Button>
                     </DialogActions>
                 </Dialog>
 
@@ -240,4 +357,4 @@ Note.defaultProps = {
     expanded: false
 }
 
-export default withStyles(useStyles)(Note)
+export default withStyles(useStyles)(withSnackbar(Note))
