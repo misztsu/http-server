@@ -57,12 +57,14 @@ public:
     Coroutine<void> send(const std::string &buff)
     {
         size_t length = 0;
+        size_t totalLength = 0;
         DEBUG << "sending" << buff.size() << "bytes of data starting with" << buff.substr(0, std::min(buff.size(), 16UL)) << "... on socket" << socket;
-        while (length != buff.size())
+        while (totalLength != buff.size())
         {
             do
             {
-                code = length = ::send(socket, buff.c_str() + length, buff.size() - length, MSG_DONTWAIT | MSG_NOSIGNAL);
+                code = length = ::send(socket, buff.c_str() + totalLength, buff.size() - totalLength, MSG_DONTWAIT | MSG_NOSIGNAL);
+                totalLength += length;
                 DEBUG << "send on socket" << socket << "returned" << code << "errno is" << errno;
                 if (tryAgain(code))
                     co_await std::suspend_always();
@@ -79,6 +81,7 @@ public:
             }
 
             DEBUG << length << "bytes sent";
+            DEBUG << buff.size() - totalLength << "bytes left";
         }
         DEBUG << "all bytes sent on socket" << socket;
         co_return;
@@ -131,8 +134,6 @@ public:
         do
         {
             code = recv(socket, buff.data(), buff.size(), 0);
-            //if (code > 0)
-            //    throw std::runtime_error(buff);
         } while (code > 0);
         closeWithoutReceiving();
     }
