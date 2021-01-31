@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
+#include "File.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
 #include "RequestHandler.h"
@@ -61,15 +62,18 @@ public:
         {".css", "text/css"},
         {".ico", "image/x-icon"},
         {".json", "application/json"},
-        {".map", "application/octet-stream"}
+        {".map", "application/octet-stream"},
+        {".txt", "text/plain"}
     };
 
     void bindStaticFile(std::string &&path, const std::filesystem::path &filePath)
     {
         if (!std::filesystem::is_regular_file(filePath))
             throw std::runtime_error("file " + filePath.string() + " not found");
-        get(std::move(path), [this, filePath] (HttpRequest &request, HttpResponse &response) {
-            sendFile(request, response, filePath);
+        std::string content = file::readAll(filePath);
+        std::string contentType = extensionToType.at(filePath.extension().string());
+        get(std::move(path), [=] (HttpRequest &request, HttpResponse &response) {
+            response.setStatus(200).setBody(content, contentType);
         });
     }
 
@@ -77,23 +81,30 @@ public:
     {
         if (!std::filesystem::is_directory(baseDir))
             throw std::runtime_error("baseDir must be a folder");
+
         static const std::string paramName = "path343048903816";
         std::string fullPath = path + ((path.back() == '/') ? "" : "/") + "<" + paramName + ">";
-        get(std::move(fullPath), [this, baseDir] (HttpRequest &request, HttpResponse &response) {
+
+        std::unordered_map<std::string, std::pair<std::string, std::string>> files;
+        for (auto &p : std::filesystem::recursive_directory_iterator(baseDir))
+        {
+            std::filesystem::path path = p.path();
+            DEBUG << path;
+            DEBUG << path.extension().native();
+            if (std::filesystem::is_regular_file(path))
+                files.emplace(path.string(), std::make_pair(file::readAll(path), extensionToType.at(path.extension().string())));
+        }
+
+        get(std::move(fullPath), [this, baseDir, files] (HttpRequest &request, HttpResponse &response) {
 
             std::string pathString = request.getPathParam(paramName);
-            if (pathString.find("..") != std::string::npos)
-            {
-                response.setStatus(HttpResponse::Status::Im_a_teapot).setBody(":>");
-                return;
-            }
-
-            if (pathString.empty())
-                pathString = "index.html";
-
             std::filesystem::path path(pathString);
             std::filesystem::path fullPath = baseDir / path;
-            sendFile(request, response, fullPath);
+            auto it = files.find(fullPath.string());
+            if (it == files.end())
+                defaultCallback(request, response);
+            else
+                response.setStatus(200).setBody(it->second.first, it->second.second).send();
         });
     }
 
@@ -138,22 +149,6 @@ private:
     };
 
     std::vector<ExceptionHandler> exceptionHandlers;
-
-    void sendFile(HttpRequest &request, HttpResponse &response, std::filesystem::path path)
-    {
-        DEBUG << "SENDING FILE" << path;
-        auto status = std::filesystem::status(path);
-        if (status.type() != std::filesystem::file_type::regular) 
-            default404(request, response);
-        else
-        {
-            std::ifstream ifstream(path.native());
-            std::string content = std::string(std::istreambuf_iterator<char>(ifstream), std::istreambuf_iterator<char>());
-            std::string extension = path.extension().native();
-            std::string type = extensionToType.at(extension);
-            response.setStatus(200).setBody(content, type);
-        }
-    }
 
     using OptionalCallback = std::optional<RequestHandler::CallbackType>;
 
