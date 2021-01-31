@@ -17,9 +17,14 @@ public:
     {
         auto it = rawHeaders.find("Connection");
         if (it != rawHeaders.end())
-            return it->first != "closed";
+            return it->second != "close";
         else
             return false;
+    }
+
+    void closeConnection()
+    {
+        rawHeaders["Connection"] = "close";
     }
 
     const std::string &getBody() { return body; }

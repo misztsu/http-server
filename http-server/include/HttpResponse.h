@@ -136,7 +136,7 @@ public:
     }
     HttpResponse &closeConnection()
     {
-        setHeader("Connection", "close");
+        HttpMessage::closeConnection();
         return *this;
     }
     HttpResponse &deleteCookie(const std::string &name, const std::string &path = "/")
