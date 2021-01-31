@@ -27,15 +27,17 @@ void pathUserLoggedInValidator(HttpRequest &request, HttpResponse &response)
         auto userId = request.getPathParam("userId");
         User &user = userManager.getUser(userId);
         if (!user.equalToken(request.getCookie("token")))
-            response.setStatus(HttpResponse::Unauthorized).setJsonBody(getMessageJson("User is not authorized to do this.")).send();
+            response.setStatus(HttpResponse::Unauthorized).setJsonBody(getMessageJson("Only user '" + userId + "' can do this")).send();
     }
 }
+
+RequestHandler::CallbackType noteIdValidator = Validators::pathParamLength("noteId", 48);
 
 int main()
 {
 
     server.get("/helloworld", [](auto &request, auto &response) {
-        response.setStatus(200).setBody("Hello");
+        response.setStatus(200).setBody("<h1>Hello</h1>:)");
     });
 
     for (auto &path : {
@@ -117,9 +119,10 @@ int main()
 
     server.get("/users/{userId}/notes/{noteId}",
                 Validators::pathParamInt("noteId"),
+                noteIdValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
-                    auto noteId = std::stoi(request.getPathParam("noteId"));
+                    auto noteId = request.getPathParam("noteId");
                     User &user = userManager.getUser(userId);
                     auto note = user.getNote(noteId);
                     response.setStatus(HttpResponse::OK)
@@ -129,9 +132,10 @@ int main()
     server.delet("/users/{userId}/notes/{noteId}",
                 Validators::pathParamInt("noteId"),
                 Validators::bodyString("/old"_json_pointer),
+                noteIdValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
-                    auto noteId = std::stoi(request.getPathParam("noteId"));
+                    auto noteId = request.getPathParam("noteId");
                     User &user = userManager.getUser(userId);
                     user.deleteNote(noteId, request.getBodyJson()["/old"_json_pointer]);
                     response.setStatus(HttpResponse::OK).setJsonBody(json{{"noteId", noteId}});
@@ -139,11 +143,12 @@ int main()
 
     server.post("/users/{userId}/notes/{noteId}",
                 Validators::pathParamInt("noteId"),
-                Validators::bodyStringNonEmpty("/content"_json_pointer),
+                Validators::bodyString("/content"_json_pointer),
                 Validators::bodyString("/old"_json_pointer),
+                noteIdValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
-                    auto noteId = std::stoi(request.getPathParam("noteId"));
+                    auto noteId = request.getPathParam("noteId");
                     User &user = userManager.getUser(userId);
                     auto note = user.getNote(noteId);
                     std::string content = request.getBodyJson()["/content"_json_pointer].get<std::string>();
@@ -155,28 +160,28 @@ int main()
 
     server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
         try {
-            auto ue = dynamic_cast<const UserManager::UserExists &>(e);
+            auto &ue = dynamic_cast<const UserManager::UserExists &>(e);
             response.setStatus(HttpResponse::Conflict).setJsonBody(getMessageJson(ue.what())).send();
         } catch (const std::bad_cast &ignored) {}
     });
 
     server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
         try {
-            auto unf = dynamic_cast<const UserManager::UserNotFound &>(e);
+            auto &unf = dynamic_cast<const UserManager::UserNotFound &>(e);
             response.setStatus(404).setJsonBody(getMessageJson(unf.what())).send();
         } catch (const std::bad_cast &ignored) {}
     });
 
     server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
         try {
-            auto nnf = dynamic_cast<const Note::NoteNotFound &>(e);
+            auto &nnf = dynamic_cast<const Note::NoteNotFound &>(e);
             response.setStatus(404).setJsonBody(getMessageJson(nnf.what())).send();
         } catch (const std::bad_cast &ignored) {}
     });
 
     server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
         try {
-            auto ov = dynamic_cast<const Note::OldVersion &>(e);
+            auto &ov = dynamic_cast<const Note::OldVersion &>(e);
             response.setStatus(HttpResponse::Conflict).setJsonBody({
                     {"message", ov.what()},
                     {"content", ov.getContent()}}).send();

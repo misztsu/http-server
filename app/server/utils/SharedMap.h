@@ -19,17 +19,17 @@ public:
 
     SharedMap(SharedMap&& other) : map(std::move(other.map)) {}
 
-    std::pair<typename MapType::iterator, bool> insert(const std::pair<K, V> &val)
+    bool insert(const std::pair<K, V> &val)
     {
         std::unique_lock lock(mutex);
-        return map.insert(val);
+        return map.insert(val).second;
     }
 
     template<typename... T>
-    std::pair<typename MapType::iterator, bool> emplace(T&&... args)
+    bool emplace(T&&... args)
     {
         std::unique_lock lock(mutex);
-        return map.emplace(std::forward<T>(args)...);
+        return map.emplace(std::forward<T>(args)...).second;
     }
 
     bool hasKey(const K &key) const
