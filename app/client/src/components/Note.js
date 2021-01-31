@@ -245,7 +245,7 @@ class Note extends React.Component {
                     </DialogActions>
                 </Dialog>
 
-                <Dialog onClose={() => this.setState({ updateDialog: false })} open={this.state.updateDialog}>
+                <Dialog disableBackdropClick disableEscapeKeyDown onClose={() => this.setState({ updateDialog: false })} open={this.state.updateDialog}>
                     <DialogTitle>
                         Someone edited this note
                     </DialogTitle>
@@ -296,7 +296,7 @@ class Note extends React.Component {
                     </DialogActions>
                 </Dialog>
 
-                <Dialog onClose={() => this.setState({ deleteDialog: false })} open={this.state.deleteDialog}>
+                <Dialog disableBackdropClick disableEscapeKeyDown onClose={() => this.setState({ deleteDialog: false })} open={this.state.deleteDialog}>
                     <DialogTitle>
                         Someone edited this note
                     </DialogTitle>
