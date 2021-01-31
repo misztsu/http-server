@@ -38,6 +38,7 @@ const useStyles = (theme) => ({
         '--font-size': theme.typography.body1.fontSize,
         '--color': theme.palette.text.primary,
         '--primary-color': theme.palette.primary.dark,
+        overflow: 'auto'
     },
     fabProgress: {
         position: 'absolute',
