@@ -98,14 +98,34 @@ class App extends React.Component {
         }
     }
 
-    async handleAddNote() {
+    async handleAddNote(content) {
         try {
             const response = await fetch(`/users/${this.state.userId}/notes/add`, {
                 method: 'GET'
             })
             const body = await response.json()
             if (response.status == 201) {
-                await this.handleRefresh({ action: 'add', userId: this.state.userId, noteId: body.noteId, expanded: true })
+                if (content && typeof content == 'string') {
+                    const response2 = await fetch(`/users/${this.state.userId}/notes/${body.noteId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            content: content,
+                            old: ''
+                        })
+                    })
+                    const body2 = await response2.json()
+                    if (response2.status == 200) {
+                        await this.handleRefresh({ action: 'add', userId: this.state.userId, noteId: body2.noteId, content: content })
+                    } else {
+                        console.warn(body2)
+                        this.props.enqueueSnackbar(body2.message, { variant: 'error' })
+                    }
+                } else {
+                    await this.handleRefresh({ action: 'add', userId: this.state.userId, noteId: body.noteId, expanded: true })
+                }
             } else {
                 console.warn(body)
                 this.props.enqueueSnackbar(body.message, { variant: 'error' })
@@ -157,7 +177,7 @@ class App extends React.Component {
                 <Route exact path="/">
                     <LoginHandler onRefresh={this.handleRefresh} />
                     <Scrollable>
-                        <Feed notes={this.state.notes.concat(this.state.sharedNotes)} onRefresh={this.handleRefresh} searchText={this.state.searchText} />
+                        <Feed notes={this.state.notes.concat(this.state.sharedNotes)} onAddNote={this.handleAddNote} onRefresh={this.handleRefresh} searchText={this.state.searchText} />
                     </Scrollable>
                     <Navbar userId={this.state.userId} onUser={this.handleUser} onRefresh={this.handleRefresh} onAddNote={this.handleAddNote} onAddSharedNote={this.handleAddSharedNote} onSearchText={searchText => this.setState({ searchText: searchText })} />
                 </Route>

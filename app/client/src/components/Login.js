@@ -56,6 +56,8 @@ class Login extends React.Component {
 
     async handleLogin(event) {
         event.preventDefault()
+        if (!/^\w{1,20}$/.test(this.state.loginUsername))
+            return
         try {
             const response = await fetch(`/users/login`, {
                 method: 'POST',
@@ -69,7 +71,6 @@ class Login extends React.Component {
             })
             const body = await response.json()
             if (response.status == 200) {
-                //this.props.enqueueSnackbar(`User "${body.userId}" logged in.`)
                 this.props.onUser(body.userId)
                 this.props.history.replace('/')
             } else {
@@ -84,6 +85,8 @@ class Login extends React.Component {
 
     async handleRegister(event) {
         event.preventDefault()
+        if (!/^\w{1,20}$/.test(this.state.registerUsername))
+            return
         try {
             const response = await fetch(`/users/add`, {
                 method: 'POST',
@@ -97,7 +100,6 @@ class Login extends React.Component {
             })
             const body = await response.json()
             if (response.status == 201) {
-                //this.props.enqueueSnackbar(`User "${body.userId}" registered.`)
                 this.props.onUser(body.userId)
                 this.props.history.replace('/')
             } else {
@@ -143,9 +145,12 @@ class Login extends React.Component {
                                     fullWidth
                                     label="Username"
                                     name="username"
-                                    error={!/^\w*$/.test(this.state.loginUsername)}
+                                    error={!/^\w{0,20}$/.test(this.state.loginUsername)}
                                     helperText={
-                                        /^\w*$/.test(this.state.loginUsername) ? ''
+                                        /^\w*$/.test(this.state.loginUsername) ? (
+                                            /^\w{0,20}$/.test(this.state.loginUsername) ? ''
+                                                : 'Username must have less than 21 characters.'
+                                        )
                                             : 'Username must not contain whitespace and special characters.'
                                     }
                                     autoFocus
@@ -188,6 +193,14 @@ class Login extends React.Component {
                                     fullWidth
                                     label="Username"
                                     name="username"
+                                    error={!/^\w{0,20}$/.test(this.state.registerUsername)}
+                                    helperText={
+                                        /^\w*$/.test(this.state.registerUsername) ? (
+                                            /^\w{0,20}$/.test(this.state.registerUsername) ? ''
+                                                : 'Username must have less than 21 characters.'
+                                        )
+                                            : 'Username must not contain whitespace and special characters.'
+                                    }
                                 />
                                 <TextField
                                     value={this.state.registerPassword}

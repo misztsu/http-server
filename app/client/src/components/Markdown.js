@@ -6,6 +6,7 @@ import { withStyles } from '@material-ui/core/styles';
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import gfm from 'remark-gfm';
+import Image from './Image';
 
 
 const useStyles = (theme) => ({
@@ -40,6 +41,10 @@ const useStyles = (theme) => ({
 
 class Markdown extends React.Component {
 
+    shouldComponentUpdate(nextProps) {
+        return nextProps.content !== this.props.content
+    }
+
     render() {
         const { classes } = this.props
         return (
@@ -47,6 +52,7 @@ class Markdown extends React.Component {
                 plugins={[[gfm, { singleTilde: false }]]}
                 source={this.props.content}
                 renderers={{
+                    image: Image,
                     link: Link,
                     div: props => <div>{props.children}</div>,
                     strong: props => <Box fontWeight="fontWeightBold" component="span">{props.children}</Box>,

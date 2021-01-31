@@ -26,6 +26,7 @@ import { withSnackbar } from 'notistack';
 import React from 'react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import Markdown from './Markdown';
+import CloudDownloadIcon from '@material-ui/icons/CloudDownload';
 
 const useStyles = (theme) => ({
     buttonBase: {
@@ -50,6 +51,12 @@ const useStyles = (theme) => ({
     },
     paper: {
         padding: theme.spacing(2)
+    },
+    deleteIcon: {
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        marginTop: theme.spacing(1),
+        display: 'block'
     }
 })
 
@@ -67,8 +74,10 @@ class Note extends React.Component {
             sharedDialog: false,
             updateDialog: false,
             deleteDialog: false,
+            saveAsNewDialog: false,
             updating: false,
-            deleting: false
+            deleting: false,
+            saveAsNew: false
         }
 
         this.expand = this.expand.bind(this)
@@ -112,14 +121,12 @@ class Note extends React.Component {
                 })
                 this.setState({ updating: false })
             } else if (response.status == 409) {
-                console.warn(body)
                 this.setState({
                     webContent: body.content,
                     updateDialog: true
                 })
             } else if (response.status == 404) {
-                this.props.enqueueSnackbar('Note was deleted.', { variant: 'error' })
-                this.setState({ updating: false })
+                this.setState({ saveAsNewDialog: true })
             } else {
                 console.warn(body)
                 this.props.enqueueSnackbar(body.message, { variant: 'error' })
@@ -130,6 +137,19 @@ class Note extends React.Component {
             this.props.enqueueSnackbar('Error.', { variant: 'error' })
             this.setState({ updating: false })
         }
+    }
+
+    async saveAsNew() {
+        if (this.state.saveAsNew) {
+            this.props.onAddNote(this.state.content)
+        }
+        this.setState({ saveAsNewDialog: false })
+        this.setState({ updating: false })
+        this.props.onRefresh({
+            action: this.props.shared ? 'deleteShared' : 'delete',
+            noteId: this.props.noteId,
+            userId: this.props.userId
+        })
     }
 
     async delete() {
@@ -143,20 +163,25 @@ class Note extends React.Component {
             })
             const body = await response.json()
             if (response.status == 200) {
+                this.setState({ deleting: false })
                 this.props.onRefresh({
                     action: this.props.shared ? 'deleteShared' : 'delete',
                     noteId: this.props.noteId,
                     userId: this.props.userId
                 })
-                this.setState({ deleting: false })
             } else if (response.status == 409) {
                 this.setState({
                     webContent: body.content,
                     deleteDialog: true
                 })
             } else if (response.status == 404) {
-                this.props.enqueueSnackbar('Note was deleted.', { variant: 'error' })
+                this.props.enqueueSnackbar('Note was already deleted.')
                 this.setState({ deleting: false })
+                this.props.onRefresh({
+                    action: this.props.shared ? 'deleteShared' : 'delete',
+                    noteId: this.props.noteId,
+                    userId: this.props.userId
+                })
             } else {
                 console.warn(body)
                 this.props.enqueueSnackbar(body.message, { variant: 'error' })
@@ -182,6 +207,18 @@ class Note extends React.Component {
                 </ButtonBase>
                 <CardActions disableSpacing>
 
+                    {!this.props.shared ? null :
+                        <IconButton fontSize="small" color="primary" onClick={() => this.setState({ sharedDialog: true })}>
+                            <CloudIcon fontSize="small" />
+                        </IconButton>
+                    }
+
+                    {!this.props.shared ? null :
+                        <IconButton fontSize="small" onClick={() => this.props.onAddNote(this.state.content)}>
+                            <CloudDownloadIcon fontSize="small" />
+                        </IconButton>
+                    }
+
                     <div className={classes.wrapper}>
                         <IconButton onClick={this.delete}>
                             <DeleteIcon />
@@ -200,19 +237,19 @@ class Note extends React.Component {
                         {!this.state.updating ? null : <CircularProgress size={48} className={classes.fabProgress} />}
                     </div>
 
-                    {!this.props.shared ? null :
-                        <IconButton fontSize="small" color="primary" onClick={() => this.setState({ sharedDialog: true })}>
-                            <CloudIcon fontSize="small" />
-                        </IconButton>
-                    }
-
                 </CardActions>
                 <Collapse in={this.state.expanded} timeout="auto" >
                     <MDEditor
                         key={this.state.key}
                         value={this.state.content}
                         height={240}
-                        onChange={content => this.setState({ content: content })}
+                        onChange={content => {
+                            if (content.length > 90000) {
+                                this.props.enqueueSnackbar('Note length exceeded 90000 characters, cropping to fit the maximum length.')
+                                this.setState({ content: content.substr(0, 90000) })
+                            } else
+                                this.setState({ content: content })
+                        }}
                         preview="edit"
                         className={classes.editor}
                     />
@@ -342,6 +379,53 @@ class Note extends React.Component {
                             })
                         }}>
                             Don't delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                <Dialog disableBackdropClick disableEscapeKeyDown onClose={() => this.setState({ saveAsNewDialog: false })} open={this.state.saveAsNewDialog}>
+                    <DialogTitle>
+                        Someone deleted this note
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Oops! Someone deleted this note.
+                        </DialogContentText>
+                        <Grid container spacing={1} justify="space-around">
+                            <Grid item xs>
+                                <Paper variant="outlined" className={classes.paper}>
+                                    <Typography variant="button" component="div">Your version</Typography>
+                                    <Markdown content={this.state.content} />
+                                </Paper>
+                            </Grid>
+                            <Grid item xs>
+                                <Paper variant="outlined" className={classes.paper}>
+                                    <Typography variant="button" component="div">Web version</Typography>
+                                    <DeleteIcon className={classes.deleteIcon} fontSize="large" color="disabled" />
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button color="primary" onClick={() => {
+                            this.setState({
+                                saveAsNewDialog: false,
+                                saveAsNew: false
+                            }, () => {
+                                this.saveAsNew()
+                            })
+                        }}>
+                            Discard note
+                        </Button>
+                        <Button color="primary" onClick={() => {
+                            this.setState({
+                                saveAsNewDialog: false,
+                                saveAsNew: true
+                            }, () => {
+                                this.saveAsNew()
+                            })
+                        }}>
+                            Save as new
                         </Button>
                     </DialogActions>
                 </Dialog>

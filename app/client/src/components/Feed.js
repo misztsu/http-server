@@ -52,7 +52,7 @@ class Feed extends React.Component {
                         this.search().map(
                             (note, id) => (
                                 <Grid item key={id} className={note.visible !== false ? null : this.props.classes.hidden}>
-                                    <Note onRefresh={this.props.onRefresh} {...note} />
+                                    <Note onAddNote={this.props.onAddNote} onRefresh={this.props.onRefresh} {...note} />
                                 </Grid>
                             )
                         )
