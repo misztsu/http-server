@@ -66,6 +66,21 @@ public:
         };
     }
 
+    static RequestHandler::CallbackType bodyStringMaxLength(const json::json_pointer &param, size_t length)
+    {
+        return [=](auto &request, auto &response) {
+            try {
+                auto s = request.getBodyJson().at(param);
+                if (s.type() != json::value_t::string)
+                    RequestUtils::send400Json(response, "Body element " + param.to_string() + " must be string", body, param.to_string());
+                if (static_cast<std::string>(s).size() > length)
+                    RequestUtils::send400Json(response, param.to_string() + " must be no longer than " + std::to_string(length), body, param.to_string());
+            } catch (const json::out_of_range &e) {
+                RequestUtils::send400Json(response, "Body element " + param.to_string() + " is required", body, param.to_string());
+            }
+        };
+    }
+
     static RequestHandler::CallbackType bodyString(const json::json_pointer &param)
     {
         return bodyType(param, json::value_t::string, "string");

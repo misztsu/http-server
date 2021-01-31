@@ -10,8 +10,8 @@ using json = nlohmann::json;
 const std::filesystem::path indexHtml = "frontend_static/index.html";
 const std::filesystem::path frontEndStatic = "frontend_static/";
 
-UserManager userManager;
 HttpServer server;
+UserManager userManager;
 
 json getMessageJson(const std::string &message)
 {
@@ -51,6 +51,7 @@ int main()
 
     server.post("/users/add",
                 Validators::bodyStringNonEmptyNoWhitespaces("/userId"_json_pointer),
+                Validators::bodyStringMaxLength("/userId"_json_pointer, 20),
                 Validators::bodyStringNonEmpty("/hash"_json_pointer),
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
@@ -63,6 +64,7 @@ int main()
 
     server.post("/users/login",
                 Validators::bodyStringNonEmptyNoWhitespaces("/userId"_json_pointer),
+                Validators::bodyStringMaxLength("/userId"_json_pointer, 20),
                 Validators::bodyStringNonEmpty("/hash"_json_pointer),
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
@@ -80,6 +82,7 @@ int main()
 
     server.post("/users/logout",
                 Validators::bodyStringNonEmptyNoWhitespaces("/userId"_json_pointer),
+                Validators::bodyStringMaxLength("/userId"_json_pointer, 20),
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getBodyJson()["/userId"_json_pointer].get<std::string>();
                     response.setStatus(HttpResponse::OK).deleteCookie("token").setJsonBody(json{{"userId", userId}});
@@ -108,7 +111,7 @@ int main()
                     response.setStatus(HttpResponse::Created).setJsonBody(json{{"noteId", note->getNoteId()}, {"userId", user.getUserId()}});
                 });
 
-    server.get("/users/{userId}/notes/loadExamples",
+    server.post("/users/{userId}/notes/loadExamples",
                 pathUserLoggedInValidator,
                 [&](auto &request, auto &response) {
                     auto userId = request.getPathParam("userId");
@@ -118,7 +121,6 @@ int main()
                 });
 
     server.get("/users/{userId}/notes/{noteId}",
-                Validators::pathParamInt("noteId"),
                 noteIdValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
@@ -129,9 +131,10 @@ int main()
                         .setJsonBody(json{{"userId", note->getUserId()}, {"noteId", note->getNoteId()}, {"content", note->getContent()}});
                 });
 
+    const size_t maxNoteLength = 9000;
+
     server.delet("/users/{userId}/notes/{noteId}",
-                Validators::pathParamInt("noteId"),
-                Validators::bodyString("/old"_json_pointer),
+                Validators::bodyStringMaxLength("/old"_json_pointer, maxNoteLength),
                 noteIdValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
@@ -142,9 +145,8 @@ int main()
                 });
 
     server.post("/users/{userId}/notes/{noteId}",
-                Validators::pathParamInt("noteId"),
-                Validators::bodyString("/content"_json_pointer),
-                Validators::bodyString("/old"_json_pointer),
+                Validators::bodyStringMaxLength("/content"_json_pointer, maxNoteLength),
+                Validators::bodyStringMaxLength("/old"_json_pointer, maxNoteLength),
                 noteIdValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");

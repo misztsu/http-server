@@ -179,8 +179,6 @@ private:
 
         if (request.getMethod() != HttpRequest::Method::head)
             message += body;
-        
-        DEBUG << message;
 
         auto sendCoroutine = tcpClient.send(message);
         iterative_co_await(sendCoroutine);

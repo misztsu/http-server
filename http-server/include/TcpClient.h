@@ -104,7 +104,7 @@ public:
             buff.resize(length);
         }
         else
-                throw ConnectionClosedException();
+            throw ConnectionClosedException();
 
         if (buff.empty())
             throw ConnectionClosedException();

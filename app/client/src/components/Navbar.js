@@ -134,7 +134,7 @@ class Navbar extends React.Component {
         event.preventDefault()
         try {
             const response = await fetch(`/users/${this.props.userId}/notes/loadExamples`, {
-                method: 'GET'
+                method: 'POST'
             })
             const body = await response.json()
             if (response.status == 200) {
