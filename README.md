@@ -1,13 +1,19 @@
 # Http-server
 
-Http-server jest asynchronicznym serwerem HTTP opartym o `epoll` oraz korutyny ze standardu C++20.
+Http-server is asynchronous HTTP server using `epoll` and C++20 coroutines.
+
+## Clone
+
+```sh
+git clone --recurse-submodules https://github.com/misztsu/http-server
+```
 
 ## Building
 
-Build with cmake.
+### Build server
 
-This version works only on linux (because of epoll)
-and requires g++ version 10+ (because of coroutines).
+Build with `cmake`. This server works only on linux (because of `epoll` )
+and requires `g++` version 10+ (because of coroutines).
 In case it is not your default C++ compiler you can use
 `DCMAKE_CXX_COMPILER` option, for example on Ubuntu 20.04:
 
@@ -16,17 +22,21 @@ cmake -B build -DCMAKE_CXX_COMPILER=g++-10
 cmake --build build
 ```
 
-## TODO:
+### Build client
 
-- [x] readme
-- [x] implementacja `TcpServer` i `TcpClient`
-- [x] implementacja klas obietnic potrzebnych do korutyn
-- [x] implementacja systemu wznawiającego korutyny z `epoll`
-- [ ] implementacja `HttpServer` z jakimś interfejsem typu `server.use<GET>(std::regex(...), [](Request &req, Response &Res) { ... });`
-    - [x] połączenie z `epoll`
-    - [x] parsowanie wiadomości HTTP
-    - [x] implementacja tego `use<>`
-    - [x] `Request` i `Response`
-    - [ ] cache dla zasobów
-- [ ] implementacja aplikacji opartej o `HttpServer`
-- [x] frontend
+Requires `npm` and `node`.
+
+```sh
+./build_frontend.sh
+```
+
+## Run
+
+```sh
+cd bin/
+./kittyNotes 3000
+```
+
+```sh
+google-chrome http://localhost:3000/
+```
