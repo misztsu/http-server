@@ -82,6 +82,7 @@ class Note extends React.Component {
 
         this.expand = this.expand.bind(this)
         this.update = this.update.bind(this)
+        this.saveAsNew = this.saveAsNew.bind(this)
         this.delete = this.delete.bind(this)
     }
 

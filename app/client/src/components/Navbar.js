@@ -230,11 +230,11 @@ class Navbar extends React.Component {
                             label="Url"
                             fullWidth
                             error={
-                                !/^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]+\/shared\/(\w+)\/([0-9]+)\/?$/.test(this.state.sharedNoteUrl)
+                                !/^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]+\/shared\/(\w+)\/([0-9a-f]+)\/?$/.test(this.state.sharedNoteUrl)
                                 && this.state.sharedNoteUrl.length > 0
                             }
                             helperText={
-                                (/^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]+\/shared\/(\w+)\/([0-9]+)\/?$/.test(this.state.sharedNoteUrl)
+                                (/^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]+\/shared\/(\w+)\/([0-9a-f]+)\/?$/.test(this.state.sharedNoteUrl)
                                     || this.state.sharedNoteUrl.length == 0) ? ''
                                     : 'This is not valid shared note url.'
                             }
@@ -243,8 +243,8 @@ class Navbar extends React.Component {
                     <DialogActions>
                         <Button onClick={() => this.setState({ loadSharedNoteUrl: false })}>Cancel</Button>
                         <Button onClick={() => {
-                            const note = this.state.sharedNoteUrl.match(/\/(\w+)\/([0-9]+)\/?$/)
-                            if (note.length > 2)
+                            const note = this.state.sharedNoteUrl.match(/\/(\w+)\/([0-9a-f]+)\/?$/)
+                            if (note && note.length > 2)
                                 this.props.onAddSharedNote({
                                     userId: note[1],
                                     noteId: note[2]

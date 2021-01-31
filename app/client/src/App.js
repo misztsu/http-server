@@ -15,8 +15,8 @@ class App extends React.Component {
 
         this.state = {
             searchText: '',
-            notes: [],
-            sharedNotes: [],
+            notes: JSON.parse(localStorage.getItem('notes')) || [],
+            sharedNotes: JSON.parse(localStorage.getItem('sharedNotes')) || [],
             userId: localStorage.getItem('userId') || ''
         }
 
@@ -24,6 +24,14 @@ class App extends React.Component {
         this.handleAddNote = this.handleAddNote.bind(this)
         this.handleAddSharedNote = this.handleAddSharedNote.bind(this)
         this.handleUser = this.handleUser.bind(this)
+    }
+
+    saveNotes() {
+        localStorage.setItem('notes', JSON.stringify(this.state.notes))
+    }
+
+    saveSharedNotes() {
+        localStorage.setItem('sharedNotes', JSON.stringify(this.state.sharedNotes))
     }
 
     async handleRefresh(command) {
@@ -35,7 +43,7 @@ class App extends React.Component {
                             ...note,
                             content: command.content
                         } : note)
-                    })
+                    }, this.saveNotes)
                     break;
 
                 case 'updateShared':
@@ -44,32 +52,32 @@ class App extends React.Component {
                             ...note,
                             content: command.content
                         } : note)
-                    })
+                    }, this.saveSharedNotes)
                     break;
 
                 case 'delete':
                     this.setState({
                         notes: this.state.notes.filter(note => note.noteId !== command.noteId),
-                    })
+                    }, this.saveNotes)
                     break;
 
                 case 'deleteShared':
                     this.setState({
                         sharedNotes: this.state.sharedNotes.filter(note => !(note.noteId === command.noteId && note.userId === command.userId)),
-                    })
+                    }, this.saveSharedNotes)
                     break;
 
                 case 'add':
                     this.setState({
                         notes: this.state.notes.concat([{ ...command, action: undefined }])
-                    })
+                    }, this.saveNotes)
                     break;
 
                 case 'addShared':
                     if (this.state.sharedNotes.findIndex(note => note.noteId === command.noteId && note.userId === command.userId) === -1)
                         this.setState({
                             sharedNotes: this.state.sharedNotes.concat([{ ...command, action: undefined, shared: true }])
-                        })
+                        }, this.saveSharedNotes)
                     break;
             }
         } else if (this.state.userId) {
@@ -80,8 +88,12 @@ class App extends React.Component {
                 const body = await response.json()
                 if (response.status == 200) {
                     this.setState({
-                        notes: (await body).sort((a, b) => a.noteId - b.noteId).map(note => ({ ...note, content: note.content }))
-                    })
+                        notes: (await body).sort((a, b) => {
+                            if (a.noteId < b.noteId) return -1
+                            if (a.noteId > b.noteId) return 1
+                            return 0
+                        }).map(note => ({ ...note, content: note.content }))
+                    }, this.saveNotes)
                 } else if (response.status == 401) {
                     await this.handleUser('')
                     this.props.history.replace('/login')
@@ -89,6 +101,20 @@ class App extends React.Component {
                     console.warn(body)
                     this.props.enqueueSnackbar(body.message, { variant: 'error' })
                 }
+                this.setState({
+                    sharedNotes: (await Promise.all(this.state.sharedNotes.map(async note => {
+                        try {
+                            return {
+                                ...(await (await fetch(`/users/${note.userId}/notes/${note.noteId}`, {
+                                    method: 'GET'
+                                })).json()),
+                                shared: true
+                            }
+                        } catch (error) {
+                            return null
+                        }
+                    }))).filter(note => note && note.userId && note.noteId)
+                }, this.saveSharedNotes)
             } catch (error) {
                 console.error(error)
                 this.props.enqueueSnackbar('Error.', { variant: 'error' })
@@ -155,12 +181,15 @@ class App extends React.Component {
     }
 
     async handleUser(userId) {
+        localStorage.removeItem('notes')
+        localStorage.removeItem('sharedNotes')
+        this.setState({ notes: [], sharedNotes: [] })
         if (userId === '') {
             localStorage.removeItem('userId')
             this.setState({ userId: '' }, () => this.handleRefresh())
         } else {
             localStorage.setItem('userId', userId)
-            this.setState({ userId: userId }, () => this.handleRefresh())
+            this.setState({ userId: userId, }, () => this.handleRefresh())
         }
     }
 
