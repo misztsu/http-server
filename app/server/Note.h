@@ -80,7 +80,7 @@ public:
         return userId;
     }
 
-    int getNoteId() const
+    std::string getNoteId() const
     {
         return noteId;
     }
@@ -110,35 +110,36 @@ public:
     class NoteException : public std::logic_error
     {
     public:
-        NoteException(std::string message, const std::string &userId, int noteId) : std::logic_error(message), userId(userId), noteId(noteId) {}
+        NoteException(const std::string &message, const std::string &userId, const std::string &noteId) : std::logic_error(message), userId(userId), noteId(noteId) {}
         const std::string &getUserId() const { return userId; }
-        int getNoteId() const { return noteId; }
+        const std::string &getNoteId() const { return noteId; }
     private:
         const std::string userId;
-        const int noteId;
+        const std::string noteId;
     };
 
     class NoteNotFound : public NoteException
     {
     public:
-        NoteNotFound(const std::string &userId, int noteId) : NoteException("Note " + userId + "/" + std::to_string(noteId) + " not found", userId, noteId) {}
+        NoteNotFound(const std::string &userId, const std::string &noteId) : NoteException("Note " + userId + "/" + noteId + " not found", userId, noteId) {}
     };
 
     class OldVersion : public NoteException
     {
     public:
-        OldVersion(std::string content, const std::string &userId, int noteId) :
-            NoteException("Note " + userId + "/" + std::to_string(noteId) + " has a new version", userId, noteId),
+        OldVersion(std::string content, const std::string &userId, std::string noteId) :
+            NoteException("Note " + userId + "/" + noteId + " has a new version", userId, noteId),
             content(content) {}
-        const std::string &getContent() { return content; }
+        const std::string &getContent() const { return content; }
     private:
         std::string content;
     };
 
+
+
 private:
-    Note(const std::string &userId_, int noteId_) : userId(userId_), noteId(noteId_), path("users/" + userId + "/" + std::to_string(noteId) + ".txt")
+    Note(const std::string &userId, const std::string noteId) : userId(userId), noteId(noteId), path("users/" + userId + "/" + noteId + ".md")
     {
-        DEBUG << "read" << path;
         if (std::filesystem::exists(path) && std::filesystem::is_regular_file(path))
         {
             content = file::readAll(path);
@@ -158,7 +159,7 @@ private:
 
     std::string content;
     const std::string userId;
-    const int noteId;
+    const std::string noteId;
     const std::filesystem::path path;
     friend class User;
 

@@ -31,6 +31,14 @@ public:
         };
     }
 
+    static RequestHandler::CallbackType pathParamLength(const std::string &param, size_t length)
+    {
+        return [=](auto &request, auto &response) {
+            if (request.getPathParam(param).size() != length)
+                RequestUtils::send400Json(response, "Argument " + param + " should have length of " + std::to_string(length), path, param);
+        };
+    }
+
     static RequestHandler::CallbackType bodyRegex(const json::json_pointer &param, const std::regex &regex, const std::string &patternName = "matching specific regex")
     {
         return [=](auto &request, auto &response) {
