@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <utility>
+#include <stack>
 #include <string>
 
 #define STRINGIFY(x) #x

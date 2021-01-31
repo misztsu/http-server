@@ -33,8 +33,16 @@ void pathUserLoggedInValidator(HttpRequest &request, HttpResponse &response)
 
 RequestHandler::CallbackType noteIdValidator = Validators::pathParamLength("noteId", 48);
 
-int main()
+int main(int argc, char **argv)
 {
+    int port = 3001;
+    if (argc == 2)
+        port = std::stoi(argv[1]);
+    else if (argc > 2) 
+    {
+        std::cerr << "Too many arguments" << std::endl;
+        return 0;
+    }
 
     server.get("/helloworld", [](auto &request, auto &response) {
         response.setStatus(200).setBody("<h1>Hello</h1>:)");
@@ -102,7 +110,7 @@ int main()
                     response.setStatus(HttpResponse::OK).setJsonBody(body);
                 });
 
-    server.get("/users/{userId}/notes/add",
+    server.post("/users/{userId}/notes/add",
                 pathUserLoggedInValidator,
                 [&](HttpRequest &request, HttpResponse &response) {
                     auto userId = request.getPathParam("userId");
@@ -193,5 +201,5 @@ int main()
     // for testing frontend on development server
     // server.addAccessControllAllowOrigin("*");
 
-    server.listen(3001);
+    server.listen(port);
 }
