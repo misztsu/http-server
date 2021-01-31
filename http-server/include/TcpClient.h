@@ -64,7 +64,8 @@ public:
             do
             {
                 code = length = ::send(socket, buff.c_str() + totalLength, buff.size() - totalLength, MSG_DONTWAIT | MSG_NOSIGNAL);
-                totalLength += length;
+                if (code != errorCode)
+                    totalLength += length;
                 DEBUG << "send on socket" << socket << "returned" << code << "errno is" << errno;
                 if (tryAgain(code))
                     co_await std::suspend_always();
@@ -73,12 +74,7 @@ public:
             } while (true);
 
             if (code == errorCode)
-            {
-                if (errno == ECONNRESET || errno == EPIPE)
-                    throw ConnectionClosedException();
-                else
-                    error("send");
-            }
+                throw ConnectionClosedException();
 
             DEBUG << length << "bytes sent";
             DEBUG << buff.size() - totalLength << "bytes left";
@@ -108,12 +104,7 @@ public:
             buff.resize(length);
         }
         else
-        {
-            if (errno == ECONNREFUSED)
                 throw ConnectionClosedException();
-            else
-                error("recv");
-        }
 
         if (buff.empty())
             throw ConnectionClosedException();
