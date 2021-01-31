@@ -246,9 +246,12 @@ class Note extends React.Component {
                         value={this.state.content}
                         height={240}
                         onChange={content => {
-                            if (content.length > 90000) {
+                            if (new Blob([content]).size > 90000) {
                                 this.props.enqueueSnackbar('Note length exceeded 90000 characters, cropping to fit the maximum length.')
-                                this.setState({ content: content.substr(0, 90000) })
+                                content = content.substr(0, 90000)
+                                while (new Blob([content]).size > 90000)
+                                    content = content.slice(0, -1)
+                                this.setState({ content: content })
                             } else
                                 this.setState({ content: content })
                         }}
