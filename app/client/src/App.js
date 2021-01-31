@@ -127,7 +127,7 @@ class App extends React.Component {
     async handleAddNote(content) {
         try {
             const response = await fetch(`/users/${this.state.userId}/notes/add`, {
-                method: 'GET'
+                method: 'POST'
             })
             const body = await response.json()
             if (response.status == 201) {
