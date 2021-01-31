@@ -183,6 +183,7 @@ private:
 
     Coroutine<void> clientHandlingTask(TcpClient&& client, Notify notify)
     {
+        DEBUG << "New client starting";
         TcpClient tcpClient = std::move(client);
         co_await std::suspend_always();
 
@@ -201,6 +202,8 @@ private:
 
                 if (request.isMalformed())
                     handleMalformed(response);
+                else if (request.isBodyNotFetched())
+                    handleTooLarge(response);
                 else if (request.getMethod() == HttpRequest::Method::trace)
                     handleTrace(request, response);
                 else if (request.getMethod() == HttpRequest::Method::options)
@@ -234,15 +237,14 @@ private:
                     co_await std::suspend_always();
                     responsePromise.wait();
                 }
-
-                keepConnection = response.isPersistentConnection();
-
                 auto sendCoroutine = response.send(tcpClient);
                 iterative_co_await(sendCoroutine);
+
+                keepConnection = response.isPersistentConnection();
             }
         } catch (TcpClient::ConnectionClosedException &ignored)
         {
-            DEBUG << R"*(Client closed connection despite no "Connection: closed")*";
+            DEBUG << R"*(Client closed connection despite no "Connection: close")*";
         }
 
         notify.release();
@@ -278,8 +280,12 @@ private:
 
     static void handleMalformed(HttpResponse &response)
     {
-        DEBUG << "malformed request";
         response.setStatus(400).setBody("Request format is malformed and could not be at all interpreted").closeConnection();
+    }
+
+    static void handleTooLarge(HttpResponse &response)
+    {
+        response.setStatus(HttpResponse::Request_Entity_Too_Large).setBody("Entity too large").closeConnection();
     }
 
     void handleOptions(HttpRequest &request, HttpResponse &response)
