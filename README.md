@@ -1,6 +1,46 @@
 # Http-server
 
-Http-server is asynchronous HTTP server using `epoll` and C++20 coroutines.
+Http-server is an asynchronous HTTP server C++ library, build using `epoll` and C++20 coroutines.
+This repository also contains example note sharing app build with it.
+
+### Code example:
+
+```C++
+#include "HttpServer.h"
+#include "Validators.h"
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+// ...
+
+int main()
+{
+    HttpServer server;
+
+    server.post("/users/{userId}/notes/{noteId}",
+            Validators::bodyStringMaxLength("/content"_json_pointer, maxNoteLength),
+            // ...
+            [&](HttpRequest &request, HttpResponse &response) {
+                auto userId = request.getPathParam("userId");
+                User &user = userManager.getUser(userId); // may throw UserNotFound
+                // ...
+                response.setStatus(HttpResponse::Created).setJsonBody(json{{"message", "ok"} /* ... */});
+            });
+
+    server.addExceptionHandler([](const std::exception &e, HttpResponse &response) {
+        try {
+            auto &unf = dynamic_cast<const UserManager::UserNotFound &>(e);
+            response.setStatus(404).setJsonBody(json{{"message", unf.what()}}).send();
+        } catch (const std::bad_cast &ignored) {}
+    });
+
+    auto staticPath = "static/";
+    server.bindStaticDirectory("/static", staticPath);
+    // ...
+
+    int port = 3001;
+    server.listen(port);
+}
+```
 
 ## Clone
 
